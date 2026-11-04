@@ -5,6 +5,8 @@ Tronc commun : 3 interfaces par rôle autour d'une base graphe.
   - Propriétaire (desktop)   : notifications, passage Original → Waste, ordre de transfert
   - Centre de tri (mobile)   : scan QR, vérification du statut Waste, accusé de réception
 
+Défi 3 : aide à la décision du centre de tri (Reuse / Remanufacture / Repurpose / Recycle).
+
 Lancement : python app.py   (voir README.md)
 """
 from functools import wraps
@@ -15,6 +17,7 @@ from flask import (Flask, abort, flash, jsonify, redirect, render_template, requ
 
 from bp import config, make_repo, workflow
 from bp.workflow import WorkflowError
+from bp import decision
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
@@ -28,7 +31,8 @@ ROLE_LABEL = {"garagiste": "Garagiste", "proprietaire": "Propriétaire Battery P
 EVENT_LABEL = {"MANUFACTURED": "Fabrication", "PUT_ON_MARKET": "Mise sur le marché",
                "MAINTENANCE": "Maintenance", "FAULT_REPORTED": "Hors d'usage signalé",
                "STATUS_CHANGED": "Statut modifié", "TRANSFER_ORDERED": "Transfert ordonné",
-               "REQUEST_REJECTED": "Demande refusée", "RECEIVED": "Réception centre de tri"}
+               "REQUEST_REJECTED": "Demande refusée", "RECEIVED": "Réception centre de tri",
+               "DECISION_RECORDED": "Décision enregistrée"}
 
 
 # --- Authentification ------------------------------------------------------------
@@ -63,7 +67,7 @@ def inject_globals():
                       if n["state"] == "PENDING")
     return dict(user=user, role_label=ROLE_LABEL, event_label=EVENT_LABEL,
                 pending_count=pending, backend=repo.backend, base_url=config.BASE_URL,
-                module_alerts=workflow.module_alerts)
+                module_alerts=workflow.module_alerts, option_fr=decision.OPTION_FR)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -222,11 +226,28 @@ def tri_home(user):
                            batteries=repo.list_batteries())
 
 
+def _decision_context(p, user):
+    """Prépare le contexte pour le panneau de décision (défi 3)."""
+    battery_id = p["battery"]["batteryId"]
+    loc = p.get("location") or {}
+    ready = (p["battery"]["status"] == "Waste" and loc.get("uid") == user["actor_uid"])
+    policy = repo.get_center_policy(user["actor_uid"])
+    tab = request.args.get("tab", "classement")
+    demands = repo.list_demands()
+    result = None
+    if ready:
+        result = decision.recommend(p, demands, params=policy)
+    return dict(ready=ready, result=result, tab=tab, demands=demands, policy=policy,
+                criteria=decision.CRITERIA, weights=decision.DEFAULT_WEIGHTS,
+                decisions=repo.get_decisions(battery_id))
+
+
 @app.route("/tri/b/<battery_id>")
 @login_required("centre_tri")
 def tri_battery(user, battery_id):
     p = load_passport(battery_id)
-    return render_template("tri_battery.html", p=p, history=repo.get_history(battery_id))
+    d = _decision_context(p, user)
+    return render_template("tri_battery.html", p=p, d=d, history=repo.get_history(battery_id))
 
 
 @app.route("/tri/b/<battery_id>/receive", methods=["POST"])
@@ -240,6 +261,78 @@ def tri_receive(user, battery_id):
     return redirect(url_for("tri_battery", battery_id=battery_id))
 
 
+@app.route("/tri/b/<battery_id>/decision", methods=["POST"])
+@login_required("centre_tri")
+def tri_decision(user, battery_id):
+    """Enregistre la décision du centre de tri (défi 3)."""
+    try:
+        p = load_passport(battery_id)
+        policy = repo.get_center_policy(user["actor_uid"])
+        demands = repo.list_demands()
+        result = decision.recommend(p, demands, params=policy)
+        chosen = request.form.get("chosen", "")
+        comment = request.form.get("comment", "")
+        opts = {o["option"]: o for o in result["options"]}
+        if chosen not in opts:
+            flash("Option inconnue.", "error")
+            return redirect(url_for("tri_battery", battery_id=battery_id))
+        if not opts[chosen]["feasible"]:
+            flash(f"{chosen} est exclu : " + " ; ".join(opts[chosen]["excluded_because"]), "error")
+            return redirect(url_for("tri_battery", battery_id=battery_id))
+        if chosen != result["recommendation"] and not (comment or "").strip():
+            flash("Choix différent de la recommandation : commentaire obligatoire.", "error")
+            return redirect(url_for("tri_battery", battery_id=battery_id))
+        loc = p.get("location") or {}
+        if p["battery"]["status"] != "Waste":
+            flash("Décision impossible : le statut n'est pas « Waste ».", "error")
+            return redirect(url_for("tri_battery", battery_id=battery_id))
+        if loc.get("uid") != user["actor_uid"]:
+            flash("Décision impossible : la batterie n'est pas réceptionnée par votre centre.", "error")
+            return redirect(url_for("tri_battery", battery_id=battery_id))
+        repo.record_decision(battery_id, user["actor_uid"], chosen, comment, result)
+        flash(f"Décision « {chosen} » enregistrée dans le Battery Passport.", "success")
+    except Exception as e:
+        flash(str(e), "error")
+    return redirect(url_for("tri_battery", battery_id=battery_id))
+
+
+@app.route("/tri/priorities", methods=["POST"])
+@login_required("centre_tri")
+def tri_priorities(user):
+    policy = repo.get_center_policy(user["actor_uid"])
+    toggle_key = request.form.get("toggle")
+    if toggle_key in policy:
+        policy[toggle_key] = not policy[toggle_key]
+        repo.set_center_policy(user["actor_uid"], policy["use_market"], policy["use_hierarchy"])
+        flash("Priorités du centre de tri mises à jour.", "success")
+    back = request.form.get("back") or url_for("tri_home")
+    return redirect(back)
+
+
+@app.route("/tri/market")
+@login_required("centre_tri")
+def tri_market(user):
+    back = request.args.get("back", "")
+    return render_template("tri_market.html", demands=repo.list_demands(),
+                           option_fr=decision.OPTION_FR, back=back)
+
+
+@app.route("/tri/market/<demand_uid>/toggle", methods=["POST"])
+@login_required("centre_tri")
+def tri_market_toggle(user, demand_uid):
+    demands = {d["uid"]: d for d in repo.list_demands()}
+    if demand_uid not in demands:
+        flash("Demande inconnue.", "error")
+    else:
+        new_state = not demands[demand_uid].get("active")
+        repo.set_demand_active(demand_uid, new_state)
+        flash(f"Demande « {demands[demand_uid]['title']} » {'activée' if new_state else 'désactivée'}.", "success")
+    back = request.form.get("back", "")
+    if back and back.startswith("/tri/"):
+        return redirect(back)
+    return redirect(url_for("tri_market"))
+
+
 # --- API JSON (pour les défis 1 et 3, et les notifications) --------------------------
 @app.route("/api/battery/<battery_id>")
 @login_required()
@@ -247,6 +340,18 @@ def api_battery(user, battery_id):
     p = load_passport(battery_id)
     return jsonify(passport=p, history=repo.get_history(battery_id),
                    module_alerts=workflow.module_alerts(p))
+
+
+@app.route("/api/battery/<battery_id>/recommendation")
+@login_required()
+def api_recommendation(user, battery_id):
+    """API JSON de recommandation (défi 3)."""
+    p = load_passport(battery_id)
+    center_uid = request.args.get("center_uid") or user.get("actor_uid")
+    policy = repo.get_center_policy(center_uid) if center_uid else {}
+    demands = repo.list_demands()
+    result = decision.recommend(p, demands, params=policy)
+    return jsonify(result)
 
 
 @app.route("/api/notifications/count")

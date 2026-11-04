@@ -1,0 +1,214 @@
+{# Défi 3 : aide à la décision du centre de tri. Variables : p, d (decision_context) #}
+{% set bid = p.battery.batteryId %}
+<section class="card dp" id="decision">
+  <h2 class="dp-title">Aide à la décision</h2>
+
+  {% if not d.ready %}
+    <p class="small muted" style="margin:0">Disponible quand la batterie est au statut « Waste » et réceptionnée par votre centre.</p>
+  {% else %}{% set r = d.result %}
+  {% set best = (r.options|selectattr('option', 'equalto', r.recommendation)|first) %}
+
+  {% if d.decisions %}{% set last = d.decisions[0] %}
+    <div class="dp-done">✅ Décision enregistrée : <strong>{{ last.chosen }}</strong>
+      <span class="muted">· {{ last.at[11:16] }} · {{ last.at[:10] }}</span></div>
+  {% endif %}
+
+  {# --- 1. La réponse, lisible en 3 secondes --- #}
+  <div class="verdict v-{{ r.recommendation }}">
+    <div class="v-label">Recommandation</div>
+    <div class="v-name">{{ r.recommendation }}</div>
+    <div class="v-action">{{ r.action }}</div>
+    <div class="v-chips">
+      {% if r.gap is none %}<span class="v-chip">seule option autorisée</span>
+      {% elif r.gap < 5 %}<span class="v-chip warn">⚠️ décision serrée (+{{ r.gap }} pts vs {{ r.runner_up }})</span>
+      {% else %}<span class="v-chip">+{{ r.gap }} pts vs {{ r.runner_up }}</span>{% endif %}
+      {% if r.market_driven %}<span class="v-chip warn">⚖️ influencée par le marché</span>{% endif %}
+      {% if not r.priorities.use_market %}<span class="v-chip">marché ignoré</span>{% endif %}
+      {% if not r.priorities.use_hierarchy %}<span class="v-chip">sans préférence réemploi</span>{% endif %}
+    </div>
+  </div>
+
+  <ul class="keys">{% for h in r.highlights %}<li>{{ h }}</li>{% endfor %}</ul>
+
+  {# --- 2. L'action principale, en un geste --- #}
+  <form method="post" action="{{ url_for('tri_decision', battery_id=bid) }}">
+    <input type="hidden" name="chosen" value="{{ r.recommendation }}">
+    {% if d.decisions %}
+      <button class="btn ghost block" type="submit">Enregistrer à nouveau : {{ r.recommendation }}</button>
+    {% else %}
+      <button class="btn accent block big" type="submit">✅ Valider : {{ r.recommendation }}</button>
+    {% endif %}
+  </form>
+  {% set others = r.options|selectattr('feasible')|rejectattr('option', 'equalto', r.recommendation)|list %}
+  {% if others %}
+  <details class="override">
+    <summary>Choisir une autre option</summary>
+    <form method="post" action="{{ url_for('tri_decision', battery_id=bid) }}">
+        <div class="radios">
+        {% for o in others %}
+          <label class="radio"><input type="radio" name="chosen" value="{{ o.option }}" {% if loop.first %}checked{% endif %}>
+            <span><strong>{{ o.option }}</strong> <span class="muted small">{{ o.score }} pts</span></span></label>
+        {% endfor %}
+      </div>
+      <label for="comment">Pourquoi ? <span class="muted">(obligatoire)</span></label>
+      <input id="comment" name="comment" required placeholder="ex. cellules corrodées au diagnostic visuel">
+      <button class="btn block" style="margin-top:10px" type="submit">Enregistrer ce choix</button>
+    </form>
+  </details>
+  {% endif %}
+
+  {# --- 3. Le détail, à la demande --- #}
+  {% set n_active = d.demands|selectattr('active')|list|length %}
+  <div class="tabs" role="tablist" data-tabs>
+    {% for key, label in [('classement', 'Scores'), ('matrice', 'Matrice'), ('marche', 'Marché'), ('priorites', 'Priorités'), ('donnees', 'Infos')] %}
+      <button type="button" role="tab" data-tab="{{ key }}" aria-selected="{{ 'true' if d.tab == key else 'false' }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  {# Classement + justification #}
+  <div class="tab-panel" data-panel="classement" {% if d.tab != 'classement' %}hidden{% endif %}>
+    {% set ranked = r.options|selectattr('feasible')|sort(attribute='score', reverse=true) %}
+    {% for o in ranked %}
+      <div class="rank {{ 'best' if o.option == r.recommendation }}">
+        <span class="rank-n">{{ loop.index }}</span>
+        <div class="rank-body">
+          <div class="row" style="justify-content:space-between"><strong>{{ o.option }}</strong><span class="num">{{ o.score }} pts</span></div>
+          <div class="stack" title="technique {{ o.technical }} + économie circulaire {{ o.hierarchy }} + marché {{ o.market }}">
+            <span class="seg tech" style="width: {{ [o.technical / 1.2, 100]|min }}%"></span>
+            <span class="seg hier" style="width: {{ o.hierarchy / 1.2 }}%"></span>
+            <span class="seg mkt" style="width: {{ o.market / 1.2 }}%"></span>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    <div class="legend small muted"><span class="seg tech"></span> technique <span class="seg hier"></span> économie circulaire <span class="seg mkt"></span> marché</div>
+    {% set excluded = r.options|rejectattr('feasible')|list %}
+    {% if excluded %}
+      <div class="excluded small">
+        {% for o in excluded %}<div><strong>{{ o.option }}</strong> exclue : {{ o.excluded_because|join(' ; ') }}</div>{% endfor %}
+      </div>
+    {% endif %}
+    <h3 style="margin:14px 0 6px">Justification</h3>
+    <ul class="just">{% for j in r.justification %}<li>{{ j }}</li>{% endfor %}</ul>
+  </div>
+
+  {# Matrice de décision #}
+  <div class="tab-panel" data-panel="matrice" {% if d.tab != 'matrice' %}hidden{% endif %}>
+    <p class="small muted" style="margin:0 0 8px">Adéquation de chaque option à chaque critère (0 = inadaptée, 1 = idéale), pondérée par le poids du critère.
+      Les poids sont fixés par le responsable du centre de tri (configuration), pas sur le terrain.</p>
+    <div class="table-wrap"><table class="matrix">
+      <tr><th>Critère</th><th class="num">Poids</th>
+        {% for o in r.options %}<th class="num {{ 'mx-off' if not o.feasible }} {{ 'mx-best' if o.option == r.recommendation }}" title="{{ o.option }}">{{ {'Reuse': 'Reuse', 'Remanufacture': 'Reman.', 'Repurpose': 'Repurp.', 'Recycle': 'Recycle'}[o.option] }}</th>{% endfor %}</tr>
+      {% for k, label in d.criteria.items() %}
+      <tr><td>{{ label.split(' :')[0].split(' (')[0] }}</td><td class="num">{{ d.weights[k]|int }}</td>
+        {% for o in r.options %}{% set f = o.criteria[k] %}
+          <td class="num mx-cell {{ 'mx-off' if not o.feasible }}" style="--f: {{ f }}">{{ '%.2f'|format(f) }}</td>
+        {% endfor %}</tr>
+      {% endfor %}
+      <tr class="mx-sum"><td colspan="2">Score technique</td>{% for o in r.options %}<td class="num {{ 'mx-off' if not o.feasible }}">{{ o.technical }}</td>{% endfor %}</tr>
+      <tr><td colspan="2">+ Écon. circulaire</td>{% for o in r.options %}<td class="num {{ 'mx-off' if not o.feasible }}">+{{ o.hierarchy }}</td>{% endfor %}</tr>
+      <tr><td colspan="2">+ Marché ×{{ d.weights.marche }}</td>{% for o in r.options %}<td class="num {{ 'mx-off' if not o.feasible }}">+{{ o.market }}</td>{% endfor %}</tr>
+      <tr class="mx-total"><td colspan="2">Score final</td>{% for o in r.options %}<td class="num {{ 'mx-best' if o.option == r.recommendation }}">{{ o.score if o.feasible else 'exclue' }}</td>{% endfor %}</tr>
+    </table></div>
+  </div>
+
+  {# Marché : activer / désactiver sans quitter la page #}
+  <div class="tab-panel" data-panel="marche" {% if d.tab != 'marche' %}hidden{% endif %}>
+    {% if not d.policy.use_market %}<div class="alert info small" style="margin-bottom:8px"><span class="icon">ℹ️</span><div>Votre centre ignore actuellement le marché (onglet Priorités) : ces demandes n'influencent pas la recommandation.</div></div>{% endif %}
+    <p class="small muted" style="margin:0 0 8px">Demandes en cours. Une demande active et compatible ajoute un bonus à l'option qu'elle sert (urgente +20, normale +10).</p>
+    {% for dm in d.demands %}
+      {% set chem_ok = (not dm.chemistries) or (r.inputs.chemistry in dm.chemistries) %}
+      {% set soce_ok = (dm.option == 'Recycle') or (r.inputs.soce is not none and r.inputs.soce >= (dm.minSoce or 0)) %}
+      {% set applies = dm.active and chem_ok and soce_ok %}
+      <form method="post" action="{{ url_for('tri_market_toggle', demand_uid=dm.uid) }}"
+            class="demand {{ 'applied' if applies else ('mismatch' if dm.active else 'off') }}">
+        <input type="hidden" name="back" value="{{ url_for('tri_battery', battery_id=bid, tab='marche') }}#decision">
+        <div class="demand-body">
+          <strong>{{ dm.title }}</strong>
+          <div class="small muted">
+            {{ dm.option }} · 
+            {% if chem_ok %}
+              <span>{{ dm.chemistries|join('/') }}</span>
+            {% else %}
+              <span class="mismatch-tag" title="Incompatible : chimie requise {{ dm.chemistries|join('/') }} &ne; batterie {{ r.inputs.chemistry }}">{{ dm.chemistries|join('/') }}</span>
+            {% endif %}
+            {% if dm.minSoce %}
+              · 
+              {% if soce_ok %}
+                <span>SOCE ≥ {{ dm.minSoce }} %</span>
+              {% else %}
+                <span class="mismatch-tag" title="Incompatible : SOCE requis ≥ {{ dm.minSoce }} % &ne; batterie {{ r.inputs.soce }} %">SOCE ≥ {{ dm.minSoce }} %</span>
+              {% endif %}
+            {% endif %}
+            · {{ dm.urgency }}
+          </div>
+          {% if dm.active and applies %}
+            <div class="small fit-ok">✔ s'applique à cette batterie (+{{ 20 if dm.urgency == 'urgente' else (10 if dm.urgency == 'normale' else 5) }} pts pour {{ dm.option }})</div>
+          {% elif dm.active %}
+            <div class="small fit-ko">✖ ne s'applique pas à cette batterie {% if not chem_ok %}(chimie {{ dm.chemistries|join('/') }} incompatible avec {{ r.inputs.chemistry }}){% elif not soce_ok %}(SOCE {{ r.inputs.soce }}% insuffisant &lt; {{ dm.minSoce }}%){% endif %}</div>
+          {% else %}
+            <div class="small muted">Demande inactive (fermée par le centre)</div>
+          {% endif %}
+        </div>
+        <button class="switch" type="submit" role="switch" aria-checked="{{ 'true' if dm.active else 'false' }}"
+                aria-label="{{ 'Désactiver' if dm.active else 'Activer' }} {{ dm.title }}"><span></span></button>
+      </form>
+    {% endfor %}
+  </div>
+
+  {# Priorités du centre : 2 choix de politique, enregistrés pour le centre #}
+  <div class="tab-panel" data-panel="priorites" {% if d.tab != 'priorites' %}hidden{% endif %}>
+    <p class="small muted" style="margin:0 0 10px">Politique de votre centre de tri, appliquée à toutes les batteries et tracée dans chaque décision.</p>
+    {% for key, title, on_txt, off_txt in [
+        ('use_market', 'Tenir compte des demandes du marché',
+         'On suit les besoins des clients, même si la batterie mériterait un meilleur usage.',
+         'Chaque batterie va vers son usage idéal, sans tenir compte des demandes.'),
+        ('use_hierarchy', 'Privilégier le réemploi avant le recyclage',
+         'À scores proches, on garde la batterie en usage le plus longtemps (hiérarchie européenne des déchets).',
+         'Aucune préférence : seul le score technique compte.')] %}
+      <form method="post" action="{{ url_for('tri_priorities') }}" class="demand {{ 'on' if d.policy[key] }}">
+        <input type="hidden" name="toggle" value="{{ key }}">
+        <input type="hidden" name="back" value="{{ url_for('tri_battery', battery_id=bid, tab='priorites') }}#decision">
+        <div class="demand-body">
+          <strong>{{ title }}</strong>
+          <div class="small muted">{{ on_txt if d.policy[key] else off_txt }}</div>
+        </div>
+        <button class="switch" type="submit" role="switch" aria-checked="{{ 'true' if d.policy[key] else 'false' }}"
+                aria-label="{{ 'Désactiver' if d.policy[key] else 'Activer' }} : {{ title }}"><span></span></button>
+      </form>
+    {% endfor %}
+  </div>
+
+  {# Données lues dans le passeport #}
+  <div class="tab-panel" data-panel="donnees" {% if d.tab != 'donnees' %}hidden{% endif %}>
+    {% set x = r.inputs %}
+    <dl class="kv small">
+      <dt>SOCE (#57)</dt><dd>{{ x.soce }} %</dd>
+      <dt>Seuil d'épuisement (#83)</dt><dd>{{ x.threshold }} %</dd>
+      <dt>Modules hors tolérance (#75)</dt><dd>{{ x.bad_modules|join(', ') or 'aucun' }}</dd>
+      <dt>Perte capacité / puissance (#54, #64)</dt><dd>{{ x.capacity_fade }} % / {{ x.power_fade }} %</dd>
+      <dt>Cycles (#78 / #77)</dt><dd>{{ x.cycles }} / {{ x.expected_cycles }}</dd>
+      <dt>Âge (#6)</dt><dd>{{ x.age_years }} ans / {{ x.expected_years }} prévus</dd>
+      <dt>Accidents · décharges · surcharges (#93, #91, #92)</dt><dd>{{ x.accidents }} · {{ x.deep_discharge }} · {{ x.overcharge }}</dd>
+      <dt>Minutes en T° extrêmes (#87, #88)</dt><dd>{{ x.temp_minutes }}</dd>
+      <dt>Chimie (#31)</dt><dd>{{ x.chemistry }}</dd>
+      <dt>Démontage · pièces (#36, #38)</dt><dd>{{ 'oui' if x.dismantling_manual else 'non' }} · {{ 'oui' if x.spare_parts else 'non' }}</dd>
+    </dl>
+  </div>
+
+  {% if d.decisions %}
+    <details class="history-dec">
+      <summary>Décisions enregistrées ({{ d.decisions|length }})</summary>
+      {% for dec in d.decisions %}
+        <div class="decision-log">
+          <strong>{{ dec.chosen }}</strong>
+          {% if dec.overridden %}<span class="badge st-PENDING">≠ recommandation ({{ dec.recommendation }})</span>
+          {% else %}<span class="badge st-APPROVED">conforme</span>{% endif %}
+          <div class="small muted">{{ dec.at|replace('T', ' ') }} · {{ dec.decidedBy }}{% if dec.demandTitle %} · 🛒 {{ dec.demandTitle }}{% endif %}</div>
+          {% if dec.comment %}<div class="small">« {{ dec.comment }} »</div>{% endif %}
+        </div>
+      {% endfor %}
+    </details>
+  {% endif %}
+  {% endif %}
+</section>

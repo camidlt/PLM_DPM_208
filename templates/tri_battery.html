@@ -8,31 +8,20 @@
 
 {% set t = p.transfer %}
 {% if p.battery.status == 'Waste' %}
-  <div class="status-check ok card">
+  <div class="status-check ok card compact">
     <div>Statut du Battery Passport</div>
     <div class="big">✅ WASTE</div>
     <div>Le statut est à jour : la batterie peut être prise en charge.</div>
   </div>
 {% else %}
-  <div class="status-check bad card">
+  <div class="status-check bad card compact">
     <div>Statut du Battery Passport</div>
     <div class="big">⛔ {{ p.battery.status|upper }}</div>
     <div>Statut NON à jour : ne pas prendre en charge, contacter le propriétaire.</div>
   </div>
 {% endif %}
 
-<div class="card">
-  <h2>Contrôle Réception Tronc Commun (#1, #2, #11)</h2>
-  <dl class="kv">
-    <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'EV Traction' }}</dd>
-    <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (engins de manutention requis)</dd>
-    <dt>Substances dangereuses (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · Classe 9</span></dd>
-    <dt>Agent d'extinction stockage (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
-    <dt>Consignes sécurité (#39)</dt><dd>Zone de quarantaine ventilée ignifugée à distance des cellules saines</dd>
-  </dl>
-</div>
-
-<div class="card">
+<div class="card reception">
   <h2>Réception</h2>
   {% if t and t.state == 'RECEIVED' %}
     <div class="alert ok"><span class="icon">📦</span><div><strong>Réceptionnée</strong>
@@ -50,16 +39,31 @@
   {% endif %}
 </div>
 
-<div class="card" style="border-style:dashed">
-  <h2>Aide à la décision (défi 3)</h2>
-  <p class="small muted" style="margin:0">Emplacement réservé : recommandation Reuse / Remanufacture /
-    Repurpose / Recycle. Les données nécessaires sont disponibles via <code>/api/battery/{{ p.battery.batteryId }}</code>.</p>
-</div>
+{# Défi 3 : aide à la décision (au centre de l'écran) #}
+{% include "_decision_panel.html" %}
 
-{{ ui.performance(p) }}
-{{ ui.modules(p) }}
-{{ ui.composition(p) }}
-{{ ui.sustainability(p) }}
-{{ ui.identification(p) }}
-{{ ui.history_card(history) }}
+{# Fiche technique complète repliée sous le panneau pour un usage terrain rapide #}
+<details class="fiche card" style="margin-top:14px">
+  <summary style="font-weight:700; cursor:pointer; padding:6px 0">📋 Fiche technique complète & contrôles</summary>
+  <div style="margin-top:12px">
+    <div class="card" style="margin-bottom:12px">
+      <h2>Contrôle Réception Tronc Commun (#1, #2, #11)</h2>
+      <dl class="kv">
+        <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'EV Traction' }}</dd>
+        <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (engins requis)</dd>
+        <dt>Substances dangereuses (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · Classe 9</span></dd>
+        <dt>Agent d'extinction stockage (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
+        <dt>Consignes sécurité (#39)</dt><dd>Zone de quarantaine ventilée ignifugée à distance des cellules saines</dd>
+      </dl>
+    </div>
+    {{ ui.performance(p) }}
+    {{ ui.modules(p) }}
+    {{ ui.composition(p) }}
+    {{ ui.sustainability(p) }}
+    {{ ui.identification(p) }}
+    {{ ui.history_card(history) }}
+  </div>
+</details>
+
+<script src="{{ url_for('static', filename='defi3.js') }}"></script>
 {% endblock %}

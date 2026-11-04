@@ -3,6 +3,7 @@
 Si le dump fourni par les organisateurs utilise d'autres noms de propriétés ou
 de relations, c'est ici (et seulement ici) qu'il faut adapter les requêtes.
 """
+import json
 import uuid
 from datetime import datetime
 
@@ -81,7 +82,7 @@ class Neo4jRepo:
     # --- initialisation -------------------------------------------------------
     def reset(self):
         """Efface les nœuds de démo puis recharge le jeu de données."""
-        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event DETACH DELETE n")
+        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event OR n:Decision DETACH DELETE n")
         uids = [uid for _, uid, _ in seed_data.NODES]
         self._write("MATCH (n) WHERE n.uid IN $uids DETACH DELETE n", uids=uids)
         for stmt in seed_data.cypher_statements():
@@ -155,6 +156,68 @@ class Neo4jRepo:
             MATCH (t)-[:FOR]->(b:BatteryInstance)
             RETURN t{.*, batteryId: b.batteryId, status: b.status} AS t
             ORDER BY t.createdAt DESC""", uid=center_uid)]
+
+    # --- défi 3 : demandes du marché et décisions ------------------------------
+    def list_demands(self):
+        return [r["d"] for r in self._read(
+            "MATCH (d:MarketDemand) RETURN d{.*} AS d ORDER BY d.option, d.title")]
+
+    def set_demand_active(self, demand_uid, active):
+        self._write("MATCH (d:MarketDemand {uid: $uid}) SET d.active = $active",
+                     uid=demand_uid, active=bool(active))
+
+    def get_center_policy(self, center_uid):
+        rows = self._read("MATCH (c:Actor {uid: $uid}) RETURN coalesce(c.policyMarket, true) AS m, "
+                          "coalesce(c.policyHierarchy, true) AS h", uid=center_uid)
+        return dict(use_market=rows[0]["m"], use_hierarchy=rows[0]["h"]) if rows else \
+            dict(use_market=True, use_hierarchy=True)
+
+    def set_center_policy(self, center_uid, use_market, use_hierarchy):
+        self._write("MATCH (c:Actor {uid: $uid}) SET c.policyMarket = $m, c.policyHierarchy = $h",
+                    uid=center_uid, m=bool(use_market), h=bool(use_hierarchy))
+
+    def get_decisions(self, battery_id):
+        return [r["d"] for r in self._read("""
+            MATCH (:BatteryInstance {batteryId: $id})-[:HAS_DECISION]->(d:Decision)
+            OPTIONAL MATCH (d)-[:FULFILLS]->(m:MarketDemand)
+            RETURN d{.*, demandTitle: m.title} AS d ORDER BY d.at DESC, coalesce(d.ts, 0) DESC""",
+            id=battery_id)]
+
+    def record_decision(self, battery_id, center_uid, chosen, comment, result):
+        """Enregistre la décision du centre de tri (défi 3)."""
+        overridden = chosen != result["recommendation"]
+        demand_uid = None
+        opts = {o["option"]: o for o in result["options"]}
+        if opts[chosen]["demands"]:
+            demand_uid = opts[chosen]["demands"][0]["uid"]
+        props = dict(recommendation=result["recommendation"], chosen=chosen, overridden=overridden,
+                     comment=(comment or "").strip(),
+                     scores=json.dumps({o["option"]: o["score"] for o in result["options"]}),
+                     justification=result["justification"], weights=json.dumps(result["weights"]),
+                     marketDriven=result["market_driven"],
+                     policyMarket=result.get("priorities", {}).get("use_market", True),
+                     policyHierarchy=result.get("priorities", {}).get("use_hierarchy", True))
+        uid = f"DEC-{uuid.uuid4().hex[:8].upper()}"
+        detail = f"Décision : {chosen} (recommandé : {result['recommendation']})" + (
+            f" - {props['comment']}" if props["comment"] else "")
+        self._write("""
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (actor:Actor {uid: $center_uid})
+            CREATE (d:Decision {uid: $uid, at: $at, ts: timestamp(), decidedBy: actor.name})
+            SET d += $props
+            CREATE (b)-[:HAS_DECISION]->(d)
+            CREATE (actor)-[:MADE]->(d)
+            WITH b, actor, d
+            OPTIONAL MATCH (m:MarketDemand {uid: $demand_uid})
+            FOREACH (_ IN CASE WHEN m IS NULL THEN [] ELSE [1] END | CREATE (d)-[:FULFILLS]->(m))
+            WITH b, actor
+            CREATE (e:Event {uid: $evt_uid, type: 'DECISION_RECORDED', at: $at, ts: timestamp(),
+                             actorName: actor.name, details: $details})
+            CREATE (b)-[:HAS_EVENT]->(e)
+            CREATE (actor)-[:PERFORMED]->(e)
+            """, bid=battery_id, center_uid=center_uid, uid=uid, at=now(), props=props,
+            demand_uid=demand_uid, evt_uid=f"EVT-{uuid.uuid4().hex[:8].upper()}", details=detail)
+        return uid
 
     # --- écritures --------------------------------------------------------------
     def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,

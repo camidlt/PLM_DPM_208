@@ -13,6 +13,8 @@ Circularity, DynamicPerformance, DynamicDurability), avec ces extensions :
   (:Event)            historique de la batterie
   (:Notification)     demande du garagiste vers le propriétaire
   (:TransferOrder)    ordre de transfert vers un centre de tri
+  (:MarketDemand)     demandes du marché (défi 3)
+  (:Decision)         décision enregistrée par le centre de tri (défi 3)
 
 Chaque nœud porte une propriété technique `uid` unique.
 """
@@ -62,12 +64,14 @@ MODELS = {
                      cathode=(["Nickel", "Manganese", "Cobalt", "Lithium"], [56, 7, 7, 30], [False, False, False, False]),
                      anode=(["Graphite", "Silicium"], [92, 8], [False, False]),
                      electrolyte=(["LiPF6", "EC/DMC"], [15, 85], [False, False]),
-                     volt=(280, 355, 403), capacity=85, cycles=1500, carbon=61.0, cls="B"),
+                     volt=(280, 355, 403), capacity=85, cycles=1500, carbon=61.0, cls="B",
+                     expectedLifetimeYears=12, capacityThresholdForExhaustion=75),
     "MOD-FC60L": dict(modelId="FC-60L", name="FluxCap 60 kWh LFP", chemistry="LFP",
                       cathode=(["Fer", "Phosphate", "Lithium"], [35, 45, 20], [False, False, False]),
                       anode=(["Graphite"], [100], [False]),
                       electrolyte=(["LiPF6", "EC/DMC"], [15, 85], [False, False]),
-                      volt=(260, 320, 365), capacity=60, cycles=3500, carbon=48.5, cls="A"),
+                      volt=(260, 320, 365), capacity=60, cycles=3500, carbon=48.5, cls="A",
+                      expectedLifetimeYears=15, capacityThresholdForExhaustion=70),
 }
 
 for mid, m in MODELS.items():
@@ -86,6 +90,8 @@ for mid, m in MODELS.items():
         nominalVoltage=m["volt"][1], maximalVoltage=m["volt"][2]))
     rel(mid, "HAS_STATIC_DURABILITY", node(
         "StaticDurability", f"SD-{mid}", expectedBatteryLifetimeCycles=m["cycles"],
+        expectedLifetimeYears=m["expectedLifetimeYears"],
+        capacityThresholdForExhaustion=m["capacityThresholdForExhaustion"],
         cRateRelevantCycleLifeTest="C/3"))
     cf = node("CarbonFootprint", f"CF-{mid}", carbonFootprintDeclared=m["carbon"],
               unit="kg CO2e / kWh", performanceClass=m["cls"],
@@ -99,30 +105,70 @@ for mid, m in MODELS.items():
     rel(mid, "HAS_CIRCULARITY", node(
         "Circularity", f"CIRC-{mid}", extinguishAgent="Eau (refroidissement massif)",
         dismantlingManual=f"https://fluxmotors.example/dismantling/{m['modelId']}",
-        partNumbers=f"https://fluxmotors.example/parts/{m['modelId']}"))
+        partNumbers=f"https://fluxmotors.example/parts/{m['modelId']}",
+        sparePartsSources=f"https://fluxmotors.example/spare-parts/{m['modelId']}"))
 
 # --- Batteries ---------------------------------------------------------------
 # Résistance interne max par module définie par le constructeur (mΩ)
 MAX_R = {"MOD-FC85": 2.0, "MOD-FC60L": 2.5}
+# Résistance interne initiale par modèle (défi 3)
+INITIAL_R = {"MOD-FC85": 1.0, "MOD-FC60L": 1.6}
 
 BATTERIES = [
     # La batterie de Doc : un module (n°3) a une résistance interne anormale
     dict(id="BAT-DOC-001", model="MOD-FC85", serial="FC85-2019-004221", built="2019-03-12",
          vehicle="DeLorean EV - VIN fictif FLUXDMC1985", status="Original", soh=71, soc=38,
          cycles=1240, accidents=0, warranty="2027-03-12", location="GARAGE-HV",
-         modules=[1.3, 1.4, 6.8, 1.2, 1.5]),
+         modules=[1.3, 1.4, 6.8, 1.2, 1.5],
+         soce=71, capacityFade=29, powerFade=34,
+         deepDischargeEvents=0, overchargeEvents=0,
+         timeAboveTempMax_min=120, timeBelowTempMin_min=0),
     dict(id="BAT-002", model="MOD-FC85", serial="FC85-2023-118734", built="2023-06-02",
          vehicle="Flux Roadster - VIN fictif FLUXRD2023", status="Original", soh=93, soc=76,
          cycles=310, accidents=0, warranty="2031-06-02", location="GARAGE-HV",
-         modules=[1.1, 1.1, 1.2, 1.0, 1.1]),
+         modules=[1.1, 1.1, 1.2, 1.0, 1.1],
+         soce=93, capacityFade=7, powerFade=5,
+         deepDischargeEvents=0, overchargeEvents=0,
+         timeAboveTempMax_min=0, timeBelowTempMin_min=0),
     dict(id="BAT-003", model="MOD-FC60L", serial="FC60L-2020-052310", built="2020-10-20",
          vehicle="Flux City - VIN fictif FLUXCT2020", status="Original", soh=64, soc=52,
          cycles=2100, accidents=1, warranty="2028-10-20", location="GARAGE-HV",
-         modules=[2.2, 2.1, 2.3, 2.2, 2.4]),
+         modules=[2.2, 2.1, 2.3, 2.2, 2.4],
+         soce=64, capacityFade=36, powerFade=31,
+         deepDischargeEvents=2, overchargeEvents=1,
+         timeAboveTempMax_min=90, timeBelowTempMin_min=0),
     dict(id="BAT-004", model="MOD-FC85", serial="FC85-2018-001876", built="2018-01-15",
          vehicle="Flux Roadster - VIN fictif FLUXRD2018", status="Waste", soh=48, soc=0,
          cycles=1980, accidents=2, warranty="2026-01-15", location="CT-NANTERRE",
-         modules=[3.1, 2.9, 3.4, 3.0, 3.6]),
+         modules=[3.1, 2.9, 3.4, 3.0, 3.6],
+         soce=48, capacityFade=52, powerFade=55,
+         deepDischargeEvents=3, overchargeEvents=2,
+         timeAboveTempMax_min=600, timeBelowTempMin_min=0),
+    # --- Batteries supplémentaires (défi 3) ---
+    # BAT-101 : NMC, SOCE 86 %, modules sains → Reuse attendu
+    dict(id="BAT-101", model="MOD-FC85", serial="FC85-2022-090412", built="2022-09-05",
+         vehicle="Flux Roadster - VIN fictif FLUXRD2022 (véhicule épave)", status="Waste",
+         soh=86, soc=40, cycles=400, accidents=0, warranty="2030-09-05", location="CT-NANTERRE",
+         modules=[1.1, 1.2, 1.1, 1.2, 1.1],
+         soce=86, capacityFade=14, powerFade=11,
+         deepDischargeEvents=0, overchargeEvents=0,
+         timeAboveTempMax_min=0, timeBelowTempMin_min=0),
+    # BAT-102 : LFP, SOCE 66 %, modules homogènes → Repurpose attendu
+    dict(id="BAT-102", model="MOD-FC60L", serial="FC60L-2018-011207", built="2018-04-17",
+         vehicle="Flux City - VIN fictif FLUXCT2018", status="Waste",
+         soh=66, soc=30, cycles=2800, accidents=0, warranty="2026-04-17", location="CT-NANTERRE",
+         modules=[2.3, 2.4, 2.3, 2.4, 2.3],
+         soce=66, capacityFade=34, powerFade=29,
+         deepDischargeEvents=1, overchargeEvents=0,
+         timeAboveTempMax_min=300, timeBelowTempMin_min=0),
+    # BAT-103 : NMC, SOCE 55 %, 7 décharges profondes → Recycle (sécurité)
+    dict(id="BAT-103", model="MOD-FC85", serial="FC85-2019-007731", built="2019-11-28",
+         vehicle="Flux Roadster - VIN fictif FLUXRD2019", status="Waste",
+         soh=55, soc=0, cycles=1700, accidents=0, warranty="2027-11-28", location="CT-NANTERRE",
+         modules=[3.4, 3.1, 3.6, 2.9, 3.3],
+         soce=55, capacityFade=45, powerFade=49,
+         deepDischargeEvents=7, overchargeEvents=1,
+         timeAboveTempMax_min=0, timeBelowTempMin_min=2400),
 ]
 
 SEED_DATE = "2026-11-03"
@@ -135,16 +181,24 @@ for b in BATTERIES:
     rel(b["model"], "HAS_BATTERY_INSTANCE", bid)
     rel("EO-FLUX", "BUILD", bid)
     rel(bid, "LOCATED_AT", b["location"])
-    rel(bid, "HAS_DYNAMIC_PERFORMANCE", node(
-        "DynamicPerformance", f"DP-{bid}", soh=b["soh"], soc=b["soc"],
-        measuredAt=f"{SEED_DATE}T09:00:00"))
-    rel(bid, "HAS_DYNAMIC_DURABILITY", node(
-        "DynamicDurability", f"DD-{bid}", warranty=b["warranty"], accidents=b["accidents"],
-        cycleCount=b["cycles"]))
+    dp_props = dict(soh=b["soh"], soc=b["soc"], measuredAt=f"{SEED_DATE}T09:00:00")
+    for k in ("soce", "capacityFade", "powerFade"):
+        if k in b:
+            dp_props[k] = b[k]
+    rel(bid, "HAS_DYNAMIC_PERFORMANCE", node("DynamicPerformance", f"DP-{bid}", **dp_props))
+    dd_props = dict(warranty=b["warranty"], accidents=b["accidents"], cycleCount=b["cycles"])
+    for k in ("deepDischargeEvents", "overchargeEvents", "timeAboveTempMax_min", "timeBelowTempMin_min"):
+        if k in b:
+            dd_props[k] = b[k]
+    rel(bid, "HAS_DYNAMIC_DURABILITY", node("DynamicDurability", f"DD-{bid}", **dd_props))
+    init_r = INITIAL_R.get(b["model"])
     for i, r in enumerate(b["modules"], start=1):
-        rel(bid, "HAS_MODULE", node(
-            "Module", f"MODULE-{bid}-{i}", index=i, internalResistance_mOhm=r,
-            maxInternalResistance_mOhm=MAX_R[b["model"]], measuredAt=f"{SEED_DATE}T09:00:00"))
+        mod_props = dict(index=i, internalResistance_mOhm=r,
+                         maxInternalResistance_mOhm=MAX_R[b["model"]],
+                         measuredAt=f"{SEED_DATE}T09:00:00")
+        if init_r is not None:
+            mod_props["initialInternalResistance_mOhm"] = init_r
+        rel(bid, "HAS_MODULE", node("Module", f"MODULE-{bid}-{i}", **mod_props))
 
     events = [("MANUFACTURED", b["built"] + "T08:00:00", "Flux Motors SAS", "Batterie produite et passeport créé"),
               ("PUT_ON_MARKET", b["built"][:4] + "-12-01T10:00:00", "Flux Motors SAS", "Mise sur le marché")]
@@ -156,6 +210,36 @@ for b in BATTERIES:
     for k, (etype, at, actor, details) in enumerate(events, start=1):
         rel(bid, "HAS_EVENT", node("Event", f"EVT-{bid}-{k}", type=etype, at=at,
                                    actorName=actor, details=details))
+
+
+# --- Demandes du marché (défi 3) ---------------------------------------------
+DEMANDS = [
+    dict(uid="DEM-REUSE", title="Batteries de remplacement VE d'occasion",
+         option="Reuse", partner="Réseau après-vente Flux Motors",
+         chemistries=["NMC 811", "LFP"], minSoce=75, urgency="normale",
+         quantity=20, location="France", active=True),
+    dict(uid="DEM-FLUXNET", title="Packs FluxCap 85 reconditionnés",
+         option="Remanufacture", partner="Atelier de reconditionnement Flux Motors",
+         chemistries=["NMC 811"], minSoce=60, urgency="normale",
+         quantity=8, location="Nanterre", active=True),
+    dict(uid="DEM-A13", title="Stockage d'énergie pour bornes de recharge - aire d'autoroute A13",
+         option="Repurpose", partner="Autoroutes Énergie (fictif)",
+         chemistries=["LFP"], minSoce=60, urgency="urgente",
+         quantity=12, location="Aire de Morainvilliers (A13)", active=True),
+    dict(uid="DEM-VTT", title="Gamme de VTT électriques de seconde main",
+         option="Repurpose", partner="Rider Cycles (fictif)",
+         chemistries=["NMC 811"], minSoce=65, urgency="urgente",
+         quantity=200, location="Lyon", active=False),
+    dict(uid="DEM-RECYC", title="Recyclage hydrométallurgique - contrat cadre",
+         option="Recycle", partner="MétauxCirculaires (fictif)",
+         chemistries=["NMC 811", "LFP"], minSoce=0, urgency="normale",
+         quantity=100, location="Normandie", active=True),
+]
+
+for dm in DEMANDS:
+    dm_props = {k: v for k, v in dm.items() if k != "uid"}
+    node("MarketDemand", dm["uid"], **dm_props)
+    rel(dm["uid"], "OFFERED_TO", "CT-NANTERRE")
 
 
 # --- Export Cypher -----------------------------------------------------------
@@ -178,7 +262,7 @@ def cypher_statements():
     out = [f"CREATE CONSTRAINT bp_{label.lower()}_uid IF NOT EXISTS "
            f"FOR (n:{label}) REQUIRE n.uid IS UNIQUE" for label in labels]
     out += [f"CREATE CONSTRAINT bp_{label.lower()}_uid IF NOT EXISTS "
-            f"FOR (n:{label}) REQUIRE n.uid IS UNIQUE" for label in ("Notification", "TransferOrder")]
+            f"FOR (n:{label}) REQUIRE n.uid IS UNIQUE" for label in ("Notification", "TransferOrder", "Decision")]
     label_of = {uid: label for label, uid, _ in NODES}
     for label, uid, props in NODES:
         body = ", ".join(f"{k}: {_lit(v)}" for k, v in props.items())

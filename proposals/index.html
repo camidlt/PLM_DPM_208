@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5 Propositions UI : Jauges & Détail du Score</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.9; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.02); }
+    }
+    .needle-transition {
+      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans antialiased">
+
+  <!-- Header -->
+  <header class="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Défi 3 · Centre de Tri</span>
+        <span class="text-xs text-slate-400">Battery Passport PoC</span>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight mt-1">Propositions de Jauges & Détail du Score</h1>
+      <p class="text-sm text-slate-400">Explorez 5 concepts graphiques (speedomètre, jauge linéaire, radar, carte mobile, multi-jauges) avec données simulées.</p>
+    </div>
+
+    <!-- Battery Test Selector -->
+    <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 p-1.5 rounded-xl text-xs">
+      <span class="text-slate-400 px-2 font-medium">Simulation :</span>
+      <button onclick="setDataset('BAT-DOC')" class="data-btn active px-3 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white" id="btn-BAT-DOC">Doc (Reman)</button>
+      <button onclick="setDataset('BAT-101')" class="data-btn px-3 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" id="btn-BAT-101">BAT-101 (Reuse)</button>
+      <button onclick="setDataset('BAT-102')" class="data-btn px-3 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" id="btn-BAT-102">BAT-102 (Repurpose)</button>
+      <button onclick="setDataset('BAT-103')" class="data-btn px-3 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700" id="btn-BAT-103">BAT-103 (Recycle)</button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="max-w-6xl mx-auto mb-6 flex flex-wrap gap-2">
+    <button onclick="switchTab(1)" id="tab-1" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-semibold border transition bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-950/40">1. Speedomètre Semi-Circulaire</button>
+    <button onclick="switchTab(2)" id="tab-2" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-semibold border transition bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800">2. Vumètre & Cascade Math</button>
+    <button onclick="switchTab(3)" id="tab-3" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-semibold border transition bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800">3. Donut & Pentagone Radar</button>
+    <button onclick="switchTab(4)" id="tab-4" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-semibold border transition bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800">4. Carte Mobile Tactile Centre de Tri</button>
+    <button onclick="switchTab(5)" id="tab-5" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-semibold border transition bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800">5. 4 Jauges en Concurrence</button>
+  </nav>
+
+  <!-- MAIN CONTAINER FOR PROPOSALS -->
+  <main class="max-w-6xl mx-auto">
+
+    <!-- ========================================================================= -->
+    <!-- PROPOSITION 1 : SPEEDOMÈTRE SEMI-CIRCULAIRE (Cockpit Style) -->
+    <!-- ========================================================================= -->
+    <section id="prop-1" class="prop-content">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Gauge Card -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col items-center">
+          <div class="w-full flex items-center justify-between mb-4">
+            <div>
+              <span class="text-xs uppercase tracking-wider text-slate-400 font-bold">Indicateur Décisionnel</span>
+              <h3 class="text-lg font-bold text-slate-100">Tachymètre de Recommandation</h3>
+            </div>
+            <span id="badge-cat-1" class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
+              Remanufacture
+            </span>
+          </div>
+
+          <!-- Semi-circle Speedometer SVG -->
+          <div class="relative w-80 h-48 my-2">
+            <svg viewBox="0 0 200 120" class="w-full h-full overflow-visible">
+              <defs>
+                <linearGradient id="gradRecycle" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#b45309" /><stop offset="100%" stop-color="#ea580c" />
+                </linearGradient>
+                <linearGradient id="gradRepurpose" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#8b5cf6" /><stop offset="100%" stop-color="#a855f7" />
+                </linearGradient>
+                <linearGradient id="gradReman" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#2563eb" /><stop offset="100%" stop-color="#38bdf8" />
+                </linearGradient>
+                <linearGradient id="gradReuse" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#059669" /><stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
+
+              <!-- Outer Arc Track (Grey Background) -->
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1e293b" stroke-width="16" stroke-linecap="round" />
+
+              <!-- Segment 1: Recycle (0 - 45) -->
+              <path d="M 20 100 A 80 80 0 0 1 54.4 43.4" fill="none" stroke="url(#gradRecycle)" stroke-width="16" />
+              <!-- Segment 2: Repurpose (45 - 75) -->
+              <path d="M 54.4 43.4 A 80 80 0 0 1 100 20" fill="none" stroke="url(#gradRepurpose)" stroke-width="16" />
+              <!-- Segment 3: Remanufacture (75 - 95) -->
+              <path d="M 100 20 A 80 80 0 0 1 145.6 43.4" fill="none" stroke="url(#gradReman)" stroke-width="16" />
+              <!-- Segment 4: Reuse (95 - 120) -->
+              <path d="M 145.6 43.4 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gradReuse)" stroke-width="16" stroke-linecap="round" />
+
+              <!-- Threshold Ticks & Labels -->
+              <text x="18" y="115" font-size="7" fill="#94a3b8" text-anchor="middle">0</text>
+              <text x="44" y="36" font-size="7" fill="#94a3b8" text-anchor="middle">45</text>
+              <text x="100" y="12" font-size="7" fill="#94a3b8" text-anchor="middle">75</text>
+              <text x="156" y="36" font-size="7" fill="#94a3b8" text-anchor="middle">95</text>
+              <text x="182" y="115" font-size="7" fill="#94a3b8" text-anchor="middle">120</text>
+
+              <!-- Needle (Pivot at 100, 100) -->
+              <g id="needle-group-1" class="needle-transition" style="transform-origin: 100px 100px; transform: rotate(-30deg);">
+                <line x1="100" y1="100" x2="100" y2="30" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" />
+                <circle cx="100" cy="100" r="8" fill="#f8fafc" />
+                <circle cx="100" cy="100" r="4" fill="#0f172a" />
+              </g>
+            </svg>
+
+            <!-- Value Display Badge inside speedometer -->
+            <div class="absolute bottom-0 inset-x-0 flex flex-col items-center justify-center">
+              <span id="score-val-1" class="text-3xl font-black text-slate-100 tracking-tight">88.5</span>
+              <span class="text-xs text-slate-400 font-medium">points / 120</span>
+            </div>
+          </div>
+
+          <!-- Zone Indicators Pill Bar -->
+          <div class="grid grid-cols-4 gap-2 w-full mt-4 pt-4 border-t border-slate-800 text-center text-xs">
+            <div class="p-2 rounded-lg bg-amber-950/20 border border-amber-900/40">
+              <div class="font-bold text-amber-500">Recycle</div>
+              <div class="text-[11px] text-slate-400">0 - 45 pts</div>
+            </div>
+            <div class="p-2 rounded-lg bg-purple-950/20 border border-purple-900/40">
+              <div class="font-bold text-purple-400">Repurpose</div>
+              <div class="text-[11px] text-slate-400">45 - 75 pts</div>
+            </div>
+            <div class="p-2 rounded-lg bg-blue-950/30 border border-blue-500/50 shadow-inner">
+              <div class="font-bold text-blue-400">Reman.</div>
+              <div class="text-[11px] text-slate-400">75 - 95 pts</div>
+            </div>
+            <div class="p-2 rounded-lg bg-emerald-950/20 border border-emerald-900/40">
+              <div class="font-bold text-emerald-400">Reuse</div>
+              <div class="text-[11px] text-slate-400">95 - 120 pts</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formula & Calculation Details -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h4 class="font-bold text-sm text-slate-200">Mini-Détails du Calcul</h4>
+              <span class="text-xs text-slate-400 font-mono">Score = T + H + M</span>
+            </div>
+
+            <!-- Mathematical Breakdown Stack -->
+            <div class="mt-4 space-y-3">
+              <!-- Technical Score -->
+              <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <div class="flex justify-between items-center text-xs font-semibold">
+                  <span class="flex items-center gap-1.5 text-slate-200">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 1. Score Technique (pondéré)
+                  </span>
+                  <span id="math-tech-1" class="text-blue-400 font-mono text-sm font-bold">75.5 pts</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">100 × (Santé 35% + Modules 25% + Usure 15% + Stress 15% + Chimie 10%)</p>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div id="bar-tech-1" class="bg-blue-500 h-full rounded-full" style="width: 75.5%;"></div>
+                </div>
+              </div>
+
+              <!-- Circular Hierarchy Bonus -->
+              <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <div class="flex justify-between items-center text-xs font-semibold">
+                  <span class="flex items-center gap-1.5 text-slate-200">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 2. Bonus Économie Circulaire
+                  </span>
+                  <span id="math-hier-1" class="text-emerald-400 font-mono text-sm font-bold">+3.0 pts</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">Hiérarchie légale UE (Reuse +5, Reman +3, Repurp +2, Recyc 0)</p>
+              </div>
+
+              <!-- Market Demand Bonus -->
+              <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                <div class="flex justify-between items-center text-xs font-semibold">
+                  <span class="flex items-center gap-1.5 text-slate-200">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 3. Bonus Demande du Marché
+                  </span>
+                  <span id="math-mkt-1" class="text-amber-400 font-mono text-sm font-bold">+10.0 pts</span>
+                </div>
+                <p id="mkt-detail-1" class="text-[11px] text-slate-400 mt-1">🛒 1 demande active : Packs FluxCap 85 (normale)</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Calculation Footer -->
+          <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-400">Total Résultat :</span>
+            <span class="font-mono text-lg font-black text-slate-100"><span id="math-total-sum-1">75.5 + 3.0 + 10.0</span> = <span id="math-total-1" class="text-blue-400">88.5</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ========================================================================= -->
+    <!-- PROPOSITION 2 : VUMÈTRE & CASCADE MATH (Tesla Cockpit) -->
+    <!-- ========================================================================= -->
+    <section id="prop-2" class="prop-content hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+          <div>
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-bold">Concept Linéaire Étagé</span>
+            <h3 class="text-xl font-bold text-slate-100">Vumètre Segmenté & Analyse en Cascade</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Catégorie atteinte :</span>
+            <span id="badge-cat-2" class="px-3 py-1 rounded-lg text-sm font-black bg-blue-600 text-white shadow-lg shadow-blue-900/40">
+              REMANUFACTURE (88.5)
+            </span>
+          </div>
+        </div>
+
+        <!-- Segmented Linear Gauge -->
+        <div class="mb-8">
+          <div class="relative w-full h-8 bg-slate-950 rounded-xl overflow-hidden p-1 flex gap-1 border border-slate-800">
+            <!-- 4 Sections with labels -->
+            <div class="w-[37.5%] h-full rounded-lg bg-gradient-to-r from-amber-700 to-amber-600 opacity-60 flex items-center px-3 justify-between text-[11px] font-bold text-white">
+              <span>Recycle</span><span>45</span>
+            </div>
+            <div class="w-[25%] h-full rounded-lg bg-gradient-to-r from-purple-700 to-purple-600 opacity-60 flex items-center px-3 justify-between text-[11px] font-bold text-white">
+              <span>Repurpose</span><span>75</span>
+            </div>
+            <div class="w-[16.6%] h-full rounded-lg bg-gradient-to-r from-blue-600 to-sky-500 opacity-90 flex items-center px-3 justify-between text-[11px] font-bold text-white shadow-lg">
+              <span>Reman</span><span>95</span>
+            </div>
+            <div class="w-[20.9%] h-full rounded-lg bg-gradient-to-r from-emerald-600 to-teal-500 opacity-60 flex items-center px-3 justify-between text-[11px] font-bold text-white">
+              <span>Reuse</span><span>120</span>
+            </div>
+
+            <!-- Dynamic Pin Cursor -->
+            <div id="linear-pin-2" class="absolute top-0 bottom-0 w-2.5 bg-white border-2 border-slate-950 rounded-full shadow-2xl transition-all duration-700" style="left: 73.7%;"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-slate-500 px-1 mt-1 font-mono">
+            <span>0</span>
+            <span>20</span>
+            <span>40</span>
+            <span>60</span>
+            <span>80</span>
+            <span>100</span>
+            <span>120 pts</span>
+          </div>
+        </div>
+
+        <!-- Waterfall / Criteria Contribution Grid -->
+        <h4 class="text-xs uppercase font-bold text-slate-400 tracking-wider mb-3">Décomposition des 5 Critères dans la Note Technique</h4>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Santé (35%)</span>
+              <span id="fit-sante-2" class="font-bold text-emerald-400">26.3 pts</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1">SOCE : 71% vs seuil 75%</div>
+            <div class="w-full bg-slate-800 h-1 rounded mt-2"><div id="bar-sante-2" class="bg-emerald-400 h-1 rounded" style="width: 75%;"></div></div>
+          </div>
+
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Modules (25%)</span>
+              <span id="fit-mod-2" class="font-bold text-emerald-400">25.0 pts</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1">1 module à remplacer</div>
+            <div class="w-full bg-slate-800 h-1 rounded mt-2"><div id="bar-mod-2" class="bg-emerald-400 h-1 rounded" style="width: 100%;"></div></div>
+          </div>
+
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Usure (15%)</span>
+              <span id="fit-usure-2" class="font-bold text-blue-400">10.5 pts</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1">1240 cycles / 7.6 ans</div>
+            <div class="w-full bg-slate-800 h-1 rounded mt-2"><div id="bar-usure-2" class="bg-blue-400 h-1 rounded" style="width: 70%;"></div></div>
+          </div>
+
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Stress (15%)</span>
+              <span id="fit-stress-2" class="font-bold text-blue-400">12.8 pts</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1">0 acc., 120min T°</div>
+            <div class="w-full bg-slate-800 h-1 rounded mt-2"><div id="bar-stress-2" class="bg-blue-400 h-1 rounded" style="width: 85%;"></div></div>
+          </div>
+
+          <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Chimie (10%)</span>
+              <span id="fit-chem-2" class="font-bold text-slate-300">5.0 pts</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-1">NMC 811</div>
+            <div class="w-full bg-slate-800 h-1 rounded mt-2"><div id="bar-chem-2" class="bg-slate-300 h-1 rounded" style="width: 50%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ========================================================================= -->
+    <!-- PROPOSITION 3 : DONUT & RADAR / PENTAGONE (Diagnostic Lab) -->
+    <!-- ========================================================================= -->
+    <section id="prop-3" class="prop-content hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Radial Donut Gauge -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-between">
+          <div class="w-full flex justify-between items-center">
+            <h3 class="font-bold text-slate-100">Donut Circulaire de Performance</h3>
+            <span class="text-xs font-mono text-slate-400">Base max 120</span>
+          </div>
+
+          <!-- Circular SVG Ring Gauge -->
+          <div class="relative w-56 h-56 my-4 flex items-center justify-center">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <!-- Background ring -->
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#1e293b" stroke-width="10" />
+              <!-- Colored Progress ring -->
+              <circle id="donut-ring-3" cx="50" cy="50" r="40" fill="transparent" stroke="#3b82f6" stroke-width="10"
+                      stroke-dasharray="251.2" stroke-dashoffset="65" stroke-linecap="round"
+                      class="transition-all duration-1000" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span id="donut-val-3" class="text-4xl font-extrabold text-slate-100 tracking-tight">88.5</span>
+              <span id="donut-cat-3" class="text-xs uppercase tracking-widest font-black text-blue-400 mt-0.5">Remanufacture</span>
+              <span class="text-[11px] text-slate-500 mt-1">Score Total Final</span>
+            </div>
+          </div>
+
+          <div class="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between text-xs">
+            <div class="text-center">
+              <div class="text-slate-400">Technique</div>
+              <div id="donut-tech-3" class="font-bold text-slate-200">75.5</div>
+            </div>
+            <div class="text-center">
+              <div class="text-slate-400">Circulaire</div>
+              <div id="donut-hier-3" class="font-bold text-emerald-400">+3.0</div>
+            </div>
+            <div class="text-center">
+              <div class="text-slate-400">Marché</div>
+              <div id="donut-mkt-3" class="font-bold text-amber-400">+10.0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pentagone / Radar chart SVG -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div class="flex justify-between items-center">
+            <h3 class="font-bold text-slate-100">Radar Multicritère de Santé</h3>
+            <span class="text-xs text-slate-400">Empreinte batterie</span>
+          </div>
+
+          <!-- Radar Polygon SVG -->
+          <div class="w-full flex justify-center py-2">
+            <svg viewBox="0 0 200 200" class="w-56 h-56">
+              <!-- Web Polygons -->
+              <polygon points="100,20 176,75 147,165 53,165 24,75" fill="none" stroke="#334155" stroke-width="1" />
+              <polygon points="100,40 157,81 135,149 65,149 43,81" fill="none" stroke="#1e293b" stroke-width="1" />
+              <polygon points="100,60 138,88 124,132 76,132 62,88" fill="none" stroke="#1e293b" stroke-width="1" />
+
+              <!-- Axes -->
+              <line x1="100" y1="100" x2="100" y2="20" stroke="#334155" stroke-width="1" stroke-dasharray="2,2" />
+              <line x1="100" y1="100" x2="176" y2="75" stroke="#334155" stroke-width="1" stroke-dasharray="2,2" />
+              <line x1="100" y1="100" x2="147" y2="165" stroke="#334155" stroke-width="1" stroke-dasharray="2,2" />
+              <line x1="100" y1="100" x2="53" y2="165" stroke="#334155" stroke-width="1" stroke-dasharray="2,2" />
+              <line x1="100" y1="100" x2="24" y2="75" stroke="#334155" stroke-width="1" stroke-dasharray="2,2" />
+
+              <!-- Dynamic Data Area -->
+              <polygon id="radar-poly-3" points="100,42 165,78 135,147 62,148 38,82"
+                       fill="rgba(59, 130, 246, 0.35)" stroke="#38bdf8" stroke-width="2" class="transition-all duration-700" />
+
+              <!-- Labels -->
+              <text x="100" y="14" font-size="8" fill="#94a3b8" text-anchor="middle">Santé (35%)</text>
+              <text x="184" y="78" font-size="8" fill="#94a3b8" text-anchor="start">Modules (25%)</text>
+              <text x="150" y="178" font-size="8" fill="#94a3b8" text-anchor="middle">Usure (15%)</text>
+              <text x="50" y="178" font-size="8" fill="#94a3b8" text-anchor="middle">Stress (15%)</text>
+              <text x="16" y="78" font-size="8" fill="#94a3b8" text-anchor="end">Chimie (10%)</text>
+            </svg>
+          </div>
+
+          <div class="text-[11px] text-slate-400 text-center bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            L'empreinte radar met en évidence le point fort : <strong id="radar-strong-3" class="text-blue-400">Module réparable (1 seul défaillant)</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ========================================================================= -->
+    <!-- PROPOSITION 4 : CARTE MOBILE COMPACTE (Opérateur de Tri) -->
+    <!-- ========================================================================= -->
+    <section id="prop-4" class="prop-content hidden">
+      <div class="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl">
+        <!-- Top Status -->
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-400">Batterie Waste réceptionnée</span>
+          <span id="badge-cat-4" class="px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
+            Remanufacture
+          </span>
+        </div>
+
+        <!-- Big Score Pill -->
+        <div class="mt-4 p-5 rounded-2xl bg-gradient-to-br from-blue-900/40 via-slate-900 to-slate-950 border border-blue-500/30 text-center relative overflow-hidden">
+          <div class="text-xs uppercase tracking-widest text-slate-400 font-semibold">Score Global d'Adéquation</div>
+          <div class="text-5xl font-black text-slate-100 my-1 tracking-tight" id="score-val-4">88.5</div>
+          <div class="text-xs text-blue-400 font-bold" id="cat-label-4">Reconditionnement préconisé</div>
+
+          <!-- Micro Speedo Arc Bar -->
+          <div class="w-full bg-slate-800 h-2 rounded-full mt-4 overflow-hidden flex">
+            <div class="bg-amber-600 h-full w-[37.5%]" title="Recycle 0-45"></div>
+            <div class="bg-purple-600 h-full w-[25%]" title="Repurpose 45-75"></div>
+            <div class="bg-blue-500 h-full w-[16.6%]" title="Remanufacture 75-95"></div>
+            <div class="bg-emerald-500 h-full w-[20.9%]" title="Reuse 95-120"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
+            <span>0</span><span>45</span><span>75</span><span>95</span><span>120</span>
+          </div>
+        </div>
+
+        <!-- Accordion Mini-Details -->
+        <div class="mt-4 border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
+          <button onclick="toggleAccordion('acc-4')" class="w-full p-3 text-left flex justify-between items-center text-xs font-bold text-slate-300 hover:bg-slate-900/50">
+            <span>🔬 Voir la formule de calcul</span>
+            <span id="acc-icon-4">▼</span>
+          </button>
+          <div id="acc-4" class="p-3 border-t border-slate-800 text-xs space-y-2">
+            <div class="flex justify-between">
+              <span class="text-slate-400">Score Technique (sur 100) :</span>
+              <strong id="tech-4" class="text-slate-200 font-mono">75.5</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Hiérarchie Déchets UE :</span>
+              <strong id="hier-4" class="text-emerald-400 font-mono">+3.0</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Bonus Marché Actif :</span>
+              <strong id="mkt-4" class="text-amber-400 font-mono">+10.0</strong>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex justify-between font-bold text-sm">
+              <span class="text-slate-300">Total :</span>
+              <span class="text-blue-400 font-mono" id="tot-4">88.5 pts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ========================================================================= -->
+    <!-- PROPOSITION 5 : COMPARATEUR DE 4 JAUGES EN PARALLÈLE -->
+    <!-- ========================================================================= -->
+    <section id="prop-5" class="prop-content hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+          <div>
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-bold">Matrice Comparative</span>
+            <h3 class="text-xl font-bold text-slate-100">Course des 4 Options d'Économie Circulaire</h3>
+          </div>
+          <div class="text-xs text-slate-400">
+            Recommandation sélectionnée : <span id="badge-cat-5" class="font-bold text-blue-400">Remanufacture</span>
+          </div>
+        </div>
+
+        <!-- 4 Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="cards-grid-5">
+
+          <!-- Reuse Card -->
+          <div id="card-reuse-5" class="p-4 rounded-xl border border-slate-800 bg-slate-950/40 opacity-70">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-bold text-sm text-emerald-400">1. Reuse</span>
+              <span id="badge-reuse-5" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">Exclu</span>
+            </div>
+            <div class="text-2xl font-black font-mono text-slate-400 my-1" id="score-reuse-5">—</div>
+            <div class="text-[11px] text-slate-400" id="reason-reuse-5">Module 3 hors tolérance constructeur</div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div id="bar-reuse-5" class="bg-emerald-500 h-full" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Remanufacture Card -->
+          <div id="card-reman-5" class="p-4 rounded-xl border-2 border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-950/50">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-bold text-sm text-blue-400">2. Remanufacture</span>
+              <span id="badge-reman-5" class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500 text-white">Élu</span>
+            </div>
+            <div class="text-2xl font-black font-mono text-blue-400 my-1" id="score-reman-5">88.5 pts</div>
+            <div class="text-[11px] text-slate-300" id="reason-reman-5">1 module défaillant à remplacer (T:75.5 + H:3 + M:10)</div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div id="bar-reman-5" class="bg-blue-500 h-full" style="width: 73.7%;"></div>
+            </div>
+          </div>
+
+          <!-- Repurpose Card -->
+          <div id="card-repurpose-5" class="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-bold text-sm text-purple-400">3. Repurpose</span>
+              <span id="badge-repurpose-5" class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400">Faisable</span>
+            </div>
+            <div class="text-2xl font-black font-mono text-purple-400 my-1" id="score-repurpose-5">72.0 pts</div>
+            <div class="text-[11px] text-slate-400" id="reason-repurpose-5">Stockage stationnaire possible (écart: -16.5 pts)</div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div id="bar-repurpose-5" class="bg-purple-500 h-full" style="width: 60%;"></div>
+            </div>
+          </div>
+
+          <!-- Recycle Card -->
+          <div id="card-recycle-5" class="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-bold text-sm text-amber-500">4. Recycle</span>
+              <span id="badge-recycle-5" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400">Faisable</span>
+            </div>
+            <div class="text-2xl font-black font-mono text-amber-500 my-1" id="score-recycle-5">42.0 pts</div>
+            <div class="text-[11px] text-slate-400" id="reason-recycle-5">Option de dernier recours (écart: -46.5 pts)</div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full mt-3 overflow-hidden">
+              <div id="bar-recycle-5" class="bg-amber-600 h-full" style="width: 35%;"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JAVASCRIPT CONTROLLING DATASETS & TABS -->
+  <script>
+    const DATASETS = {
+      'BAT-DOC': {
+        score: 88.5,
+        category: 'Remanufacture',
+        categoryFr: 'Reconditionnement',
+        angle: 42, // degrees relative to center: -90 (0pts) to +90 (120pts) -> (88.5/120)*180 - 90 = 42.75 deg
+        color: 'blue',
+        tech: 75.5,
+        hier: 3.0,
+        mkt: 10.0,
+        mktText: '🛒 1 demande active : Packs FluxCap 85 (normale)',
+        criteria: { sante: 26.3, mod: 25.0, usure: 10.5, stress: 12.8, chem: 5.0 },
+        radarPts: '100,42 165,78 135,147 62,148 38,82',
+        strong: 'Module 3 remplaçable avec manuel dispo',
+        options: {
+          reuse: { feasible: false, score: null, reason: 'Module 3 hors tolérance' },
+          reman: { feasible: true, score: 88.5, reason: '1 module défaillant à remplacer', chosen: true },
+          repurpose: { feasible: true, score: 72.0, reason: 'Stockage stationnaire possible' },
+          recycle: { feasible: true, score: 42.0, reason: 'Option de dernier recours' }
+        }
+      },
+      'BAT-101': {
+        score: 106.0,
+        category: 'Reuse',
+        categoryFr: 'Réutilisation VE directe',
+        angle: 69, // (106/120)*180 - 90 = 69 deg
+        color: 'emerald',
+        tech: 91.0,
+        hier: 5.0,
+        mkt: 10.0,
+        mktText: '🛒 Demande active : Remplacement VE d\'occasion',
+        criteria: { sante: 35.0, mod: 25.0, usure: 13.5, stress: 14.2, chem: 5.0 },
+        radarPts: '100,24 172,75 142,160 55,160 30,78',
+        strong: 'SOCE élevé (86%) et tous modules sains',
+        options: {
+          reuse: { feasible: true, score: 106.0, reason: 'Apte directement pour réemploi VE', chosen: true },
+          reman: { feasible: false, score: null, reason: 'Aucun module à remplacer' },
+          repurpose: { feasible: true, score: 68.0, reason: 'Seconde vie possible mais dommage' },
+          recycle: { feasible: true, score: 32.0, reason: 'Très déconseillé (batterie saine)' }
+        }
+      },
+      'BAT-102': {
+        score: 74.0,
+        category: 'Repurpose',
+        categoryFr: 'Seconde vie stationnaire',
+        angle: 21, // (74/120)*180 - 90 = 21 deg
+        color: 'purple',
+        tech: 52.0,
+        hier: 2.0,
+        mkt: 20.0,
+        mktText: '🛒 Demande urgente : Bornes autoroute A13 (LFP)',
+        criteria: { sante: 20.0, mod: 22.0, usure: 8.0, stress: 10.0, chem: 10.0 },
+        radarPts: '100,60 150,82 125,140 70,140 32,76',
+        strong: 'Chimie LFP idéale pour cycles stationnaires',
+        options: {
+          reuse: { feasible: false, score: null, reason: 'SOCE 66% inférieur au seuil VE (70%)' },
+          reman: { feasible: false, score: null, reason: 'Modules homogènes, pas de panne unitaire' },
+          repurpose: { feasible: true, score: 74.0, reason: 'Parfaitement adapté aux bornes A13', chosen: true },
+          recycle: { feasible: true, score: 38.0, reason: 'LFP a peu de valeur matière' }
+        }
+      },
+      'BAT-103': {
+        score: 22.0,
+        category: 'Recycle',
+        categoryFr: 'Recyclage obligatoire (Sécurité)',
+        angle: -57, // (22/120)*180 - 90 = -57 deg
+        color: 'amber',
+        tech: 22.0,
+        hier: 0.0,
+        mkt: 0.0,
+        mktText: '⛔ Règle de sécurité (7 décharges profondes)',
+        criteria: { sante: 5.0, mod: 4.0, usure: 5.0, stress: 3.0, chem: 8.0 },
+        radarPts: '100,85 115,92 110,110 90,110 80,95',
+        strong: 'Récupération matière Nickel & Cobalt (NMC)',
+        options: {
+          reuse: { feasible: false, score: null, reason: 'Exclu : règle de sécurité (7 décharges)' },
+          reman: { feasible: false, score: null, reason: 'Exclu : règle de sécurité (7 décharges)' },
+          repurpose: { feasible: false, score: null, reason: 'Exclu : règle de sécurité (7 décharges)' },
+          recycle: { feasible: true, score: 22.0, reason: 'Seule issue autorisée', chosen: true }
+        }
+      }
+    };
+
+    function switchTab(num) {
+      document.querySelectorAll('.prop-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById('prop-' + num).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-500', 'shadow-lg');
+        btn.classList.add('bg-slate-900', 'text-slate-300', 'border-slate-800');
+      });
+      const activeTab = document.getElementById('tab-' + num);
+      activeTab.classList.remove('bg-slate-900', 'text-slate-300', 'border-slate-800');
+      activeTab.classList.add('bg-emerald-600', 'text-white', 'border-emerald-500', 'shadow-lg');
+    }
+
+    function setDataset(key) {
+      document.querySelectorAll('.data-btn').forEach(b => {
+        b.classList.remove('bg-blue-600', 'text-white');
+        b.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      document.getElementById('btn-' + key).classList.remove('bg-slate-800', 'text-slate-300');
+      document.getElementById('btn-' + key).classList.add('bg-blue-600', 'text-white');
+
+      const d = DATASETS[key];
+
+      // Prop 1 updates
+      document.getElementById('needle-group-1').style.transform = `rotate(${d.angle}deg)`;
+      document.getElementById('score-val-1').innerText = d.score;
+      document.getElementById('badge-cat-1').innerText = d.category;
+      document.getElementById('math-tech-1').innerText = d.tech + ' pts';
+      document.getElementById('bar-tech-1').style.width = d.tech + '%';
+      document.getElementById('math-hier-1').innerText = '+' + d.hier + ' pts';
+      document.getElementById('math-mkt-1').innerText = '+' + d.mkt + ' pts';
+      document.getElementById('mkt-detail-1').innerText = d.mktText;
+      document.getElementById('math-total-sum-1').innerText = `${d.tech} + ${d.hier} + ${d.mkt}`;
+      document.getElementById('math-total-1').innerText = d.score;
+
+      // Prop 2 updates
+      document.getElementById('linear-pin-2').style.left = (d.score / 120 * 100) + '%';
+      document.getElementById('badge-cat-2').innerText = `${d.category.toUpperCase()} (${d.score})`;
+      document.getElementById('fit-sante-2').innerText = d.criteria.sante + ' pts';
+      document.getElementById('fit-mod-2').innerText = d.criteria.mod + ' pts';
+      document.getElementById('fit-usure-2').innerText = d.criteria.usure + ' pts';
+      document.getElementById('fit-stress-2').innerText = d.criteria.stress + ' pts';
+      document.getElementById('fit-chem-2').innerText = d.criteria.chem + ' pts';
+
+      // Prop 3 updates
+      const circumference = 2 * Math.PI * 40; // 251.2
+      const offset = circumference - (d.score / 120) * circumference;
+      document.getElementById('donut-ring-3').style.strokeDashoffset = offset;
+      document.getElementById('donut-val-3').innerText = d.score;
+      document.getElementById('donut-cat-3').innerText = d.category;
+      document.getElementById('donut-tech-3').innerText = d.tech;
+      document.getElementById('donut-hier-3').innerText = '+' + d.hier;
+      document.getElementById('donut-mkt-3').innerText = '+' + d.mkt;
+      document.getElementById('radar-poly-3').setAttribute('points', d.radarPts);
+      document.getElementById('radar-strong-3').innerText = d.strong;
+
+      // Prop 4 updates
+      document.getElementById('score-val-4').innerText = d.score;
+      document.getElementById('badge-cat-4').innerText = d.category;
+      document.getElementById('cat-label-4').innerText = d.categoryFr;
+      document.getElementById('tech-4').innerText = d.tech;
+      document.getElementById('hier-4').innerText = '+' + d.hier;
+      document.getElementById('mkt-4').innerText = '+' + d.mkt;
+      document.getElementById('tot-4').innerText = d.score + ' pts';
+
+      // Prop 5 updates
+      document.getElementById('badge-cat-5').innerText = d.category;
+      ['reuse', 'reman', 'repurpose', 'recycle'].forEach(opt => {
+        const optData = d.options[opt];
+        const card = document.getElementById('card-' + opt + '-5');
+        const badge = document.getElementById('badge-' + opt + '-5');
+        const score = document.getElementById('score-' + opt + '-5');
+        const reason = document.getElementById('reason-' + opt + '-5');
+        const bar = document.getElementById('bar-' + opt + '-5');
+
+        if (optData.chosen) {
+          card.className = "p-4 rounded-xl border-2 border-blue-500 bg-blue-950/20 shadow-lg shadow-blue-950/50";
+          badge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500 text-white";
+          badge.innerText = "Élu";
+        } else if (!optData.feasible) {
+          card.className = "p-4 rounded-xl border border-slate-800 bg-slate-950/40 opacity-60";
+          badge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30";
+          badge.innerText = "Exclu";
+        } else {
+          card.className = "p-4 rounded-xl border border-slate-800 bg-slate-950/60";
+          badge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700 text-slate-300";
+          badge.innerText = "Faisable";
+        }
+        score.innerText = optData.score !== null ? optData.score + ' pts' : '—';
+        reason.innerText = optData.reason;
+        bar.style.width = optData.score !== null ? (optData.score / 120 * 100) + '%' : '0%';
+      });
+    }
+
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      const icon = document.getElementById('acc-icon-4');
+      if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        icon.innerText = '▲';
+      } else {
+        el.classList.add('hidden');
+        icon.innerText = '▼';
+      }
+    }
+  </script>
+</body>
+</html>
