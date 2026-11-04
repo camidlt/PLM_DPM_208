@@ -31,4 +31,4 @@ if __name__ == "__main__":
     for b in seed_data.BATTERIES:
         url = f"{config.BASE_URL}/b/{b['id']}"
         save_qr(url, os.path.join(OUT, f"{b['id']}.png"))
-        print(f"{b['id']}.png  →  {url}")
+        print(f"{b['id']}.png -> {url}")

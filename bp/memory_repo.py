@@ -4,6 +4,7 @@ Permet de faire tourner la démo sans Neo4j. Les données sont partagées entre
 tous les navigateurs connectés au même serveur, et remises à zéro au redémarrage.
 """
 import copy
+import json
 import threading
 import uuid
 from datetime import datetime
@@ -162,6 +163,78 @@ class MemoryRepo:
                 b = self._out(t["uid"], "FOR")[0]
                 out.append(dict(self._clean(t), batteryId=b["batteryId"], status=b["status"]))
             return sorted(out, key=lambda t: t["createdAt"], reverse=True)
+
+    # --- défi 3 : demandes du marché et décisions ------------------------------
+    def list_demands(self):
+        with self.lock:
+            return sorted((self._clean(n) for n in self.nodes.values()
+                           if n["_label"] == "MarketDemand"),
+                          key=lambda d: (d.get("option", ""), d.get("title", "")))
+
+    def set_demand_active(self, demand_uid, active):
+        with self.lock:
+            n = self.nodes.get(demand_uid)
+            if n and n["_label"] == "MarketDemand":
+                n["active"] = bool(active)
+
+    def get_center_policy(self, center_uid):
+        with self.lock:
+            n = self.nodes.get(center_uid) or {}
+            return dict(use_market=n.get("policyMarket", True),
+                        use_hierarchy=n.get("policyHierarchy", True))
+
+    def set_center_policy(self, center_uid, use_market, use_hierarchy):
+        with self.lock:
+            n = self.nodes.get(center_uid)
+            if n:
+                n["policyMarket"] = bool(use_market)
+                n["policyHierarchy"] = bool(use_hierarchy)
+
+    def get_decisions(self, battery_id):
+        with self.lock:
+            b = self._battery(battery_id)
+            if b is None:
+                return []
+            decs = []
+            for d in self._out(b["uid"], "HAS_DECISION", "Decision"):
+                dec = self._clean(d)
+                # chercher la demande du marché liée
+                fulfilled = self._out(d["uid"], "FULFILLS", "MarketDemand")
+                if fulfilled:
+                    dec["demandTitle"] = fulfilled[0].get("title")
+                decs.append(dec)
+            return sorted(decs, key=lambda d: d.get("at", ""), reverse=True)
+
+    def record_decision(self, battery_id, center_uid, chosen, comment, result):
+        """Enregistre la décision du centre de tri (défi 3)."""
+        with self.lock:
+            from .decision import OPTION_FR
+            b = self._battery(battery_id)
+            overridden = chosen != result["recommendation"]
+            demand_uid = None
+            opts = {o["option"]: o for o in result["options"]}
+            if opts[chosen]["demands"]:
+                demand_uid = opts[chosen]["demands"][0]["uid"]
+            uid = new_uid("DEC")
+            self._add("Decision", uid,
+                      recommendation=result["recommendation"], chosen=chosen,
+                      overridden=overridden, comment=(comment or "").strip(),
+                      scores=json.dumps({o["option"]: o["score"] for o in result["options"]}),
+                      justification=result["justification"],
+                      weights=json.dumps(result["weights"]),
+                      marketDriven=result["market_driven"],
+                      policyMarket=result.get("priorities", {}).get("use_market", True),
+                      policyHierarchy=result.get("priorities", {}).get("use_hierarchy", True),
+                      at=now(), decidedBy=self.nodes[center_uid]["name"])
+            self.rels.append([b["uid"], "HAS_DECISION", uid])
+            self.rels.append([center_uid, "MADE", uid])
+            if demand_uid and demand_uid in self.nodes:
+                self.rels.append([uid, "FULFILLS", demand_uid])
+            detail = f"Décision : {chosen} (recommandé : {result['recommendation']})"
+            if comment and comment.strip():
+                detail += f" - {comment.strip()}"
+            self._event(b["uid"], "DECISION_RECORDED", center_uid, detail)
+            return uid
 
     # --- écritures (appelées par bp.workflow après contrôle des règles) ---------
     def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,
