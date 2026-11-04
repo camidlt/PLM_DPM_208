@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="doc-page">
+  <div class="doc-toolbar">
+    <button class="btn accent" onclick="window.print()">🖨️ Imprimer / PDF</button>
+    <a class="btn ghost" href="{{ url_for('transfer_detail', order_uid=doc.order.uid) }}">← Suivi du transfert</a>
+  </div>
+  <main class="doc {% block docclass %}{% endblock %}">{% block doc %}{% endblock %}</main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

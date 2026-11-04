@@ -1,0 +1,166 @@
+{
+  "battery": {
+    "batteryId": "BAT-DOC-001",
+    "batteryPassportId": "BP-BAT-DOC-001",
+    "chemistry": "NMC 811",
+    "declaredWeightKg": 520,
+    "model": "FluxCap 85 kWh",
+    "passportUrl": "http://localhost:5000/b/BAT-DOC-001",
+    "serialNumber": "FC85-2019-004221",
+    "status": "Waste"
+  },
+  "custody": {
+    "handedOverBy": "M. Brown",
+    "pickupWeightKg": 522,
+    "receiptCode": "E11A2B316C22",
+    "receptionWeightKg": 521,
+    "sealNumber": "SC-104522",
+    "weightDeviationPct": 0.2
+  },
+  "dangerousGoods": {
+    "class": "9",
+    "condition": "Batterie à recycler (non endommagée)",
+    "designation": "UN 3480 DÉCHET BATTERIES LITHIUM-ION, 9, (E)",
+    "heavyLoad": true,
+    "marking": "BATTERIES LITHIUM-ION À RECYCLER",
+    "packingInstruction": "P909",
+    "specialProvision": "DS 377",
+    "tunnelCode": "E",
+    "unNumber": "UN 3480"
+  },
+  "generatedAt": "2026-11-04T15:19:37",
+  "integrity": {
+    "algorithm": "SHA-256 chaîné",
+    "brokenAtStep": null,
+    "lastHash": "e11a2b316c224ee76c656f761170a37471526e0e7a93954fed5c18a88dda0971",
+    "valid": true
+  },
+  "order": {
+    "createdAt": "2026-11-04T15:19:29",
+    "instructions": "Accès cour arrière",
+    "pickedUpAt": "2026-11-04T15:19:31",
+    "pickupDate": "2026-11-04",
+    "pickupSlot": "8h-12h",
+    "receivedAt": "2026-11-04T15:19:32",
+    "scheduledAt": "2026-11-04T15:19:30",
+    "state": "RECEIVED",
+    "uid": "TO-6C900D46"
+  },
+  "parties": {
+    "carrier": {
+      "adr": true,
+      "agreed": true,
+      "agreementNumber": "Récépissé transport déchets 92-2024-T-0412",
+      "agreementValidUntil": "2028-06-30",
+      "city": "Gennevilliers",
+      "email": "exploitation@transbat.example",
+      "name": "TransBat Logistique",
+      "role": "transporteur",
+      "uid": "TR-TRANSBAT"
+    },
+    "destination": {
+      "address": "5 rue des Recycleurs, 92000 Nanterre",
+      "agreed": true,
+      "agreementNumber": "AGR-92-2025-014",
+      "agreementValidUntil": "2030-12-31",
+      "city": "Nanterre",
+      "email": "reception@recyclo.example",
+      "name": "Centre de tri Recyclo Nanterre",
+      "role": "centre_tri",
+      "uid": "CT-NANTERRE"
+    },
+    "holder": {
+      "address": "12 rue de l'Horloge, 92000 Nanterre",
+      "city": "Nanterre",
+      "email": "atelier@garage-hv.example",
+      "name": "Garage Hill Valley",
+      "role": "garagiste",
+      "siret": "000 000 001 00011",
+      "uid": "GARAGE-HV"
+    },
+    "producer": {
+      "address": "1 avenue du Temps, 92000 Nanterre",
+      "email": "passport@fluxmotors.example",
+      "name": "Flux Motors SAS",
+      "uid": "EO-FLUX"
+    }
+  },
+  "schema": "battery-passport/transfer-manifest/1",
+  "stateLabel": "Réceptionnée",
+  "steps": [
+    {
+      "actor": "Responsable Battery Passport - Flux Motors",
+      "actorUid": "OWNER-FLUX",
+      "at": "2026-11-04T15:19:29",
+      "data": {
+        "comment": "",
+        "damageClass": "standard",
+        "declaredWeightKg": 520,
+        "destination": "CT-NANTERRE",
+        "origin": "GARAGE-HV"
+      },
+      "hash": "23526efa2267bf61dd2100abeecc59f5689a0153516186b6af13ea99b255e1f2",
+      "label": "Ordre de transfert créé",
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "seq": 1,
+      "type": "ORDER_CREATED"
+    },
+    {
+      "actor": "Responsable Battery Passport - Flux Motors",
+      "actorUid": "OWNER-FLUX",
+      "at": "2026-11-04T15:19:30",
+      "data": {
+        "carrier": "TR-TRANSBAT",
+        "pickupDate": "2026-11-04",
+        "rescheduled": false,
+        "slot": "8h-12h"
+      },
+      "hash": "fe224b457412019c5a826fa402189dea1dc6e10ef883fb9884a79543c059797f",
+      "label": "Transporteur affecté",
+      "prevHash": "23526efa2267bf61dd2100abeecc59f5689a0153516186b6af13ea99b255e1f2",
+      "seq": 2,
+      "type": "CARRIER_ASSIGNED"
+    },
+    {
+      "actor": "TransBat Logistique",
+      "actorUid": "TR-TRANSBAT",
+      "at": "2026-11-04T15:19:31",
+      "data": {
+        "checks": [
+          "documents",
+          "labels",
+          "packaging",
+          "terminals"
+        ],
+        "handedOverBy": "M. Brown",
+        "seal": "SC-104522",
+        "weightKg": 522
+      },
+      "hash": "adaa9588d784c4cfac2cce0dd64b2a6654db50b8b2807dd09c09cc07c7e3f532",
+      "label": "Enlèvement au garage",
+      "prevHash": "fe224b457412019c5a826fa402189dea1dc6e10ef883fb9884a79543c059797f",
+      "seq": 3,
+      "type": "PICKED_UP"
+    },
+    {
+      "actor": "Centre de tri Recyclo Nanterre",
+      "actorUid": "CT-NANTERRE",
+      "at": "2026-11-04T15:19:32",
+      "data": {
+        "anomaly": "",
+        "comment": "",
+        "seal": "SC-104522",
+        "weightKg": 521
+      },
+      "hash": "e11a2b316c224ee76c656f761170a37471526e0e7a93954fed5c18a88dda0971",
+      "label": "Réception au centre de tri",
+      "prevHash": "adaa9588d784c4cfac2cce0dd64b2a6654db50b8b2807dd09c09cc07c7e3f532",
+      "seq": 4,
+      "type": "RECEIVED"
+    }
+  ],
+  "waste": {
+    "code": "16 06 05",
+    "passportStatus": "Waste"
+  }
+}

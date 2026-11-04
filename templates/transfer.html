@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}{{ t.uid }} · Transfert{% endblock %}
+{% block content %}
+{% set order = ['ORDERED', 'SCHEDULED', 'PICKED_UP', 'RECEIVED'] %}
+{% set pos = order.index(t.state) if t.state in order else (2 if t.state == 'REFUSED' else -1) %}
+{% set is_latest = p.transfer and p.transfer.uid == t.uid %}
+<p><a href="{{ url_for(role_home[user.role]) }}">← Accueil</a>
+  · <a href="{{ url_for('battery_entry', battery_id=t.batteryId) }}">Passeport {{ t.batteryId }}</a></p>
+
+<div class="card">
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <div class="muted small">Ordre de transfert · créé le {{ t.createdAt|replace('T', ' ') }}</div>
+      <h1 style="margin:0">{{ t.uid }}</h1>
+      <div class="small muted">{{ t.batteryId }} · {{ t.fromName or '—' }} → {{ t.toName }}
+        {% if t.previousOrder %}· remplace {{ t.previousOrder }}{% endif %}</div>
+    </div>
+    {{ ui.status_badge(t.state) }}
+  </div>
+  <ol class="steps">
+    {% for s, label in [('ORDERED', 'Ordre créé'), ('SCHEDULED', 'Transporteur affecté'), ('PICKED_UP', 'Enlevée, en transit'), ('RECEIVED', 'Réceptionnée')] %}
+      <li class="{{ 'done' if loop.index0 < pos or t.state == 'RECEIVED' else ('current' if loop.index0 == pos else '') }}">{{ label }}</li>
+    {% endfor %}
+  </ol>
+  {% if t.state == 'REFUSED' %}
+    <div class="alert bad" style="margin-top:12px"><span class="icon">⛔</span><div><strong>Réception refusée par {{ t.toName }}</strong>
+      {{ t.refusedAt|replace('T', ' ') }} : {{ t.refusalReason }}. La batterie reste sous la garde de {{ t.carrierName }}.</div></div>
+  {% elif t.state == 'CANCELLED' %}
+    <div class="alert warn" style="margin-top:12px"><span class="icon">✖️</span><div><strong>Ordre annulé</strong>
+      {{ t.cancelledAt|replace('T', ' ') }} : {{ t.cancelReason }}</div></div>
+  {% endif %}
+</div>
+
+<div class="grid side" style="margin-top:16px">
+  <div>
+    {# ---------- Actions selon le rôle ---------- #}
+    {% if user.role == 'proprietaire' and t.state in ('ORDERED', 'SCHEDULED') %}
+    <div class="card">
+      <h2>{{ 'Modifier l\'enlèvement' if t.state == 'SCHEDULED' else 'Planifier l\'enlèvement' }}</h2>
+      <p class="small muted">Seuls les transporteurs agréés (ADR classe 9, récépissé de transport de déchets valide{% if t.damageClass != 'standard' %}, équipés pour les batteries endommagées{% endif %}) sont sélectionnables.</p>
+      <form method="post" action="{{ url_for('transfer_schedule', order_uid=t.uid) }}">
+        <label for="carrier">Transporteur</label>
+        <select id="carrier" name="carrier" required>
+          {% for c in carriers %}
+            <option value="{{ c.uid }}" {% if c.problems %}disabled{% endif %} {% if c.uid == t.carrierUid %}selected{% endif %}>
+              {{ c.name }} ({{ c.city }}) · {{ c.problems|join(', ') if c.problems else 'agréé jusqu\'au ' ~ c.agreementValidUntil }}</option>
+          {% endfor %}
+        </select>
+        <div class="grid two">
+          <div><label for="pickup_date">Date d'enlèvement</label>
+            <input id="pickup_date" name="pickup_date" type="date" min="{{ today }}" value="{{ t.pickupDate or today }}" required></div>
+          <div><label for="slot">Créneau</label>
+            <select id="slot" name="slot">
+              {% for s in ['8h-12h', '14h-18h'] %}<option {% if t.pickupSlot == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select></div>
+        </div>
+        <label for="instructions">Consignes au transporteur</label>
+        <input id="instructions" name="instructions" value="{{ t.instructions or '' }}" placeholder="ex. accès par la cour arrière, chariot élévateur sur place">
+        <button class="btn accent block" style="margin-top:12px" type="submit">🚚 {{ 'Replanifier' if t.state == 'SCHEDULED' else 'Affecter et notifier' }}</button>
+      </form>
+      <details style="margin-top:12px"><summary class="small">Annuler l'ordre</summary>
+        <form method="post" action="{{ url_for('transfer_cancel', order_uid=t.uid) }}">
+          <label for="reason">Motif</label>
+          <input id="reason" name="reason" required placeholder="ex. batterie reprise par l'usine">
+          <button class="btn ghost block" style="margin-top:10px" type="submit">Annuler l'ordre</button>
+        </form>
+      </details>
+    </div>
+    {% elif user.role == 'proprietaire' and t.state in ('REFUSED', 'CANCELLED') and is_latest %}
+    <div class="card">
+      <h2>{{ 'Rediriger la batterie' if t.state == 'REFUSED' else 'Nouvel ordre de transfert' }}</h2>
+      <p class="small muted">{% if t.state == 'REFUSED' %}La batterie est déjà chargée sous scellé chez {{ t.carrierName }} : elle sera livrée à un autre centre sans nouvel enlèvement.
+        {% else %}Créer un nouvel ordre depuis {{ t.fromName }}.{% endif %}</p>
+      <form method="post" action="{{ url_for('owner_new_order', battery_id=t.batteryId) }}">
+        <label for="destination">Centre de tri</label>
+        <select id="destination" name="destination" required>
+          {% for c in centers %}{% set excluded = c.problems or (t.state == 'REFUSED' and c.uid == t.toUid) %}
+            <option value="{{ c.uid }}" {% if excluded %}disabled{% endif %}>{{ c.name }} ({{ c.city }}) ·
+              {{ c.problems|join(', ') if c.problems else ('a refusé la batterie' if c.uid == t.toUid and t.state == 'REFUSED' else 'agréé ' ~ c.agreementNumber) }}</option>
+          {% endfor %}
+        </select>
+        <label for="ocomment">Commentaire</label>
+        <input id="ocomment" name="comment" placeholder="optionnel">
+        <button class="btn accent block" style="margin-top:12px" type="submit">Créer l'ordre</button>
+      </form>
+    </div>
+    {% elif user.role == 'transporteur' and t.state == 'SCHEDULED' and t.carrierUid == user.actor_uid %}
+    <div class="card">
+      <h2>Enlèvement chez {{ t.fromName }}</h2>
+      <p class="small muted">Prévu le {{ t.pickupDate }} {{ t.pickupSlot or '' }}.{% if t.instructions %} Consignes : {{ t.instructions }}{% endif %}</p>
+      <form method="post" action="{{ url_for('transfer_pickup', order_uid=t.uid) }}">
+        <div class="grid two">
+          <div><label for="seal">N° du scellé posé</label>
+            <input id="seal" name="seal" required autocapitalize="characters" placeholder="ex. SC-104522"></div>
+          <div><label for="weight">Poids pesé (kg)</label>
+            <input id="weight" name="weight" required inputmode="decimal" placeholder="déclaré : {{ t.declaredWeightKg or '?' }} kg"></div>
+        </div>
+        <label for="handed_over_by">Remis par (nom de la personne du garage)</label>
+        <input id="handed_over_by" name="handed_over_by" required placeholder="ex. M. Brown, chef d'atelier">
+        <div class="checks">
+          {% for key, label in pickup_checks.items() %}
+            <label><input type="checkbox" name="check_{{ key }}" value="1" required>
+              <span>{{ label }}{% if key == 'packaging' %} : <strong>{{ t.adrPacking }}</strong>{% endif %}</span></label>
+          {% endfor %}
+        </div>
+        <button class="btn accent block" style="margin-top:10px" type="submit">✍️ Confirmer l'enlèvement</button>
+      </form>
+    </div>
+    {% elif user.role == 'transporteur' and t.state == 'PICKED_UP' %}
+    <div class="card"><div class="alert info"><span class="icon">🚚</span><div><strong>Batterie sous votre garde</strong>
+      À livrer à {{ t.toName }}{% if doc.parties.destination.address %}, {{ doc.parties.destination.address }}{% endif %}.
+      Le centre vérifiera le scellé {{ t.sealNumber }}.</div></div></div>
+    {% elif user.role == 'centre_tri' and t.state == 'PICKED_UP' and t.toUid == user.actor_uid %}
+    <div class="card"><a class="btn accent block" href="{{ url_for('tri_battery', battery_id=t.batteryId) }}">📦 Réceptionner la batterie</a></div>
+    {% endif %}
+
+    {# ---------- Conformité ---------- #}
+    {% set dg = doc.dangerousGoods %}
+    <div class="card">
+      <h2>Conformité du transport</h2>
+      {% if t.damageClass != 'standard' %}
+        <div class="alert bad" style="margin-bottom:12px"><span class="icon">⚠️</span><div><strong>{{ adr.label }}</strong>
+          Emballage et transporteur spécifiques ({{ dg.specialProvision }}).</div></div>
+      {% endif %}
+      <dl class="kv">
+        <dt>Désignation ADR</dt><dd>{{ dg.designation }}</dd>
+        <dt>État</dt><dd>{{ dg.condition }} · {{ dg.specialProvision }}</dd>
+        <dt>Emballage</dt><dd>{{ dg.packingInstruction }}</dd>
+        <dt>Marquage</dt><dd>{{ dg.marking }}</dd>
+        <dt>Masse déclarée</dt><dd>{{ t.declaredWeightKg or '—' }} kg{% if dg.heavyLoad %} · plus de 333 kg : conducteur formé ADR et consignes écrites obligatoires{% endif %}</dd>
+        <dt>Code déchet</dt><dd>{{ doc.waste.code }}</dd>
+      </dl>
+      <h3 style="margin-top:1rem">Acteurs</h3>
+      <div class="table-wrap"><table>
+        <tr><th>Rôle</th><th>Acteur</th><th>Agrément</th></tr>
+        {% for label, a in [('Producteur (passeport)', doc.parties.producer), ('Détenteur (remise)', doc.parties.holder), ('Transporteur', doc.parties.carrier), ('Destinataire', doc.parties.destination)] %}
+        <tr><td>{{ label }}</td><td>{{ a.name if a else '—' }}</td>
+          <td class="small">{% if a and a.agreementNumber %}{{ a.agreementNumber }}{% if a.agreementValidUntil %} · valide jusqu'au {{ a.agreementValidUntil }}{% endif %}{% elif a and a.role in ('transporteur', 'centre_tri') %}<span class="badge st-REJECTED">non agréé</span>{% else %}—{% endif %}</td></tr>
+        {% endfor %}
+      </table></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Documents</h2>
+      <div class="grid" style="gap:8px">
+        <a class="btn ghost block" href="{{ url_for('transfer_print', order_uid=t.uid, doc_type='ordre') }}" target="_blank">📄 Ordre de transfert</a>
+        <a class="btn ghost block" href="{{ url_for('transfer_print', order_uid=t.uid, doc_type='etiquette') }}" target="_blank">🏷️ Étiquette QR du colis</a>
+        <a class="btn ghost block" href="{{ url_for('transfer_print', order_uid=t.uid, doc_type='manifeste') }}" target="_blank">📋 Manifeste et preuve de dépôt</a>
+        <a class="btn ghost block" href="{{ url_for('api_transfer', order_uid=t.uid, download=1) }}">{ } Manifeste JSON</a>
+      </div>
+      <p class="small muted" style="margin:.6rem 0 0">Documents générés depuis le graphe, à imprimer ou enregistrer en PDF.</p>
+    </div>
+
+    <div class="card">
+      <h2>Preuves</h2>
+      {% set c = doc.custody %}
+      <dl class="kv">
+        <dt>Scellé</dt><dd>{{ c.sealNumber or '—' }}</dd>
+        <dt>Remis par</dt><dd>{{ c.handedOverBy or '—' }}</dd>
+        <dt>Pesée enlèvement</dt><dd>{{ (c.pickupWeightKg ~ ' kg') if c.pickupWeightKg else '—' }}</dd>
+        <dt>Pesée réception</dt><dd>{{ (c.receptionWeightKg ~ ' kg') if c.receptionWeightKg else '—' }}</dd>
+        {% if c.anomaly %}<dt>Anomalie</dt><dd style="color:var(--bad)">{{ c.anomaly }}</dd>{% endif %}
+        <dt>Preuve de dépôt</dt><dd>{{ c.receiptCode or '—' }}</dd>
+      </dl>
+      {% if doc.integrity.valid %}
+        <div class="alert ok" style="margin-top:12px"><span class="icon">🔒</span><div><strong>Chaîne de preuves intacte</strong>
+          {{ doc.steps|length }} étape(s) signée(s), empreintes SHA-256 chaînées.</div></div>
+      {% else %}
+        <div class="alert bad" style="margin-top:12px"><span class="icon">⛔</span><div><strong>Chaîne de preuves altérée</strong>
+          à partir de l'étape {{ doc.integrity.brokenAtStep }}.</div></div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Étapes signées</h2>
+      <ul class="timeline">
+        {% for s in doc.steps|reverse %}
+          <li class="ev-{{ s.type }}">
+            <div class="when">{{ s.at|replace('T', ' ') }} · {{ s.actor }}</div>
+            <strong>{{ s.seq }}. {{ s.label }}</strong>
+            <div class="hash muted">#{{ s.hash[:16] }}…</div>
+          </li>
+        {% else %}<li>Aucune étape.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -42,7 +42,8 @@ def check_transition(current, target):
         raise WorkflowError(f"Transition de statut interdite : {current} → {target}.")
 
 
-def request_waste(repo, battery_id, garage, fault_type, comment):
+def request_waste(repo, battery_id, garage, fault_type, comment, destination_uid,
+                  auto_logistics=False, pickup_date="", pickup_slot=""):
     """Le garagiste signale la batterie hors d'usage au propriétaire du passeport."""
     p = repo.get_passport(battery_id)
     if p is None:
@@ -53,6 +54,12 @@ def request_waste(repo, battery_id, garage, fault_type, comment):
     check_transition(status, "Waste")
     if fault_type not in FAULT_TYPES:
         raise WorkflowError("Type de défaut inconnu.")
+    centers = {c["uid"]: c for c in repo.list_actors("centre_tri")}
+    if destination_uid not in centers:
+        raise WorkflowError("Centre de tri inconnu.")
+    from . import logistics
+    logistics.check_actor(centers[destination_uid], "Centre de tri",
+                          damage=logistics.damage_class(fault_type))
     if not p.get("operator"):
         raise WorkflowError("Aucun propriétaire (opérateur économique) lié à cette batterie.")
     alerts = module_alerts(p)
@@ -63,10 +70,12 @@ def request_waste(repo, battery_id, garage, fault_type, comment):
     return repo.create_status_request(
         battery_id=battery_id, actor_uid=garage["actor_uid"],
         operator_uid=p["operator"]["uid"], from_status=status, requested_status="Waste",
-        reason=f"{fault_type}. {comment}".strip(), diagnostic=diagnostic)
+        reason=f"{fault_type}. {comment}".strip(), diagnostic=diagnostic,
+        destination_uid=destination_uid, auto_logistics=bool(auto_logistics),
+        pickup_date=(pickup_date or "").strip(), pickup_slot=(pickup_slot or "").strip())
 
 
-def approve_request(repo, notif_uid, owner, destination_uid, comment=""):
+def approve_request(repo, notif_uid, owner, comment=""):
     """Le propriétaire valide : statut → Waste + ordre de transfert vers un centre de tri."""
     n = repo.get_notification(notif_uid)
     if n is None:
@@ -77,15 +86,20 @@ def approve_request(repo, notif_uid, owner, destination_uid, comment=""):
         raise WorkflowError("Vous n'êtes pas propriétaire de ce passeport.")
     p = repo.get_passport(n["batteryId"])
     check_transition(p["battery"]["status"], n["requestedStatus"])
+    destination_uid = n.get("destinationUid", "")
     centers = {c["uid"]: c for c in repo.list_actors("centre_tri")}
     if destination_uid not in centers:
         raise WorkflowError("Centre de tri inconnu.")
     if not centers[destination_uid].get("agreed"):
         raise WorkflowError("Ce centre de tri n'est pas agréé : transfert refusé.")
+    from . import logistics  # défi 2 : validité de l'agrément, batteries endommagées
+    logistics.check_actor(centers[destination_uid], "Centre de tri",
+                          damage=logistics.damage_class(n.get("reason")))
     repo.apply_approval(notif_uid=notif_uid, battery_id=n["batteryId"],
                         owner_uid=owner["actor_uid"], new_status=n["requestedStatus"],
                         from_status=p["battery"]["status"], destination_uid=destination_uid,
                         comment=comment)
+    return logistics.init_order(repo, n["batteryId"], owner["actor_uid"], n.get("reason"), comment)
 
 
 def reject_request(repo, notif_uid, owner, comment):
@@ -100,17 +114,8 @@ def reject_request(repo, notif_uid, owner, comment):
                          owner_uid=owner["actor_uid"], comment=comment)
 
 
-def confirm_reception(repo, battery_id, center):
-    """Le centre de tri accuse réception. Refusé si le statut n'est pas à jour."""
-    p = repo.get_passport(battery_id)
-    if p is None:
-        raise WorkflowError(f"Batterie {battery_id} introuvable.")
-    if p["battery"]["status"] != "Waste":
-        raise WorkflowError("Statut non à jour (pas « Waste ») : réception refusée, "
-                            "contactez le propriétaire du passeport.")
-    t = p.get("transfer")
-    if not t or t["state"] != "ORDERED":
-        raise WorkflowError("Aucun ordre de transfert en cours pour cette batterie.")
-    if t["toUid"] != center["actor_uid"]:
-        raise WorkflowError(f"Cette batterie est attendue par « {t['toName']} », pas par votre centre.")
-    repo.apply_reception(order_uid=t["uid"], battery_id=battery_id, center_uid=center["actor_uid"])
+def confirm_reception(repo, battery_id, center, seal="", weight=None, checks=None, comment=""):
+    """Le centre de tri accuse réception. Défi 2 : la batterie doit avoir été enlevée par
+    un transporteur, avec scellé et pesée vérifiés (règles dans bp/logistics.py)."""
+    from . import logistics
+    return logistics.receive(repo, battery_id, center, seal, weight, checks or {}, comment)

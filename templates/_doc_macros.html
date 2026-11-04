@@ -1,0 +1,35 @@
+{% macro party(title, a) %}
+<div class="doc-box">
+  <h3>{{ title }}</h3>
+  {% if a %}<strong>{{ a.name }}</strong>
+    {% if a.address %}<div>{{ a.address }}</div>{% elif a.city %}<div>{{ a.city }}</div>{% endif %}
+    {% if a.siret %}<div>SIRET {{ a.siret }}</div>{% endif %}
+    {% if a.email %}<div>{{ a.email }}</div>{% endif %}
+    {% if a.agreementNumber %}<div>{{ a.agreementNumber }}{% if a.agreementValidUntil %} (valide jusqu'au {{ a.agreementValidUntil }}){% endif %}</div>{% endif %}
+  {% else %}<span class="muted">Non affecté</span>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro head(doc, title) %}
+<header class="doc-head">
+  <div>
+    <div class="muted small">Battery Passport · {{ doc.parties.producer.name if doc.parties.producer else '' }}</div>
+    <h1>{{ title }}</h1>
+    <div><strong>{{ doc.order.uid }}</strong> · état : {{ doc.stateLabel }} · édité le {{ doc.generatedAt|replace('T', ' ') }}</div>
+  </div>
+  {% if qr %}<div class="qr svg-qr">{{ qr|safe }}</div>{% else %}<div class="qr" data-qr="{{ doc.battery.passportUrl }}"></div>{% endif %}
+</header>
+{% endmacro %}
+
+{% macro goods(doc) %}{% set dg = doc.dangerousGoods %}
+<div class="doc-box">
+  <h3>Marchandise dangereuse (ADR) et déchet</h3>
+  <div><strong>{{ dg.designation }}</strong></div>
+  <div>{{ dg.condition }} · {{ dg.specialProvision }} · emballage {{ dg.packingInstruction }}</div>
+  <div>Marquage : « {{ dg.marking }} »</div>
+  <div>Batterie {{ doc.battery.batteryId }} · n° de série {{ doc.battery.serialNumber }} · {{ doc.battery.model }} ({{ doc.battery.chemistry }})
+    · masse déclarée {{ doc.battery.declaredWeightKg }} kg</div>
+  <div>Code déchet {{ doc.waste.code }} · statut du passeport : {{ doc.waste.passportStatus }}</div>
+  {% if dg.heavyLoad %}<div>Plus de 333 kg : conducteur titulaire de la formation ADR, consignes écrites à bord.</div>{% endif %}
+</div>
+{% endmacro %}

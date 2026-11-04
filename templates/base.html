@@ -16,6 +16,8 @@
       <a class="bell" href="{{ url_for('owner_home') }}#inbox" title="Notifications">🔔
         <span class="count" data-n="{{ pending_count }}">{{ pending_count }}</span></a>
     {% endif %}
+    <a class="bell" href="{{ url_for('messages') }}" title="Messages">✉️
+      <span class="count" data-n="{{ unread_count }}">{{ unread_count }}</span></a>
     <span class="small who" style="opacity:.8">{{ user.display }}</span>
     <a class="link" href="{{ url_for('logout') }}">Déconnexion</a>
   </header>

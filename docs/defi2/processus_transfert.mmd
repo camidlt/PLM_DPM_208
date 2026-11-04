@@ -1,0 +1,46 @@
+flowchart BT
+  classDef evt fill:#fde5f0,stroke:#e5267a,color:#1b1640
+  classDef gate fill:#fff1dc,stroke:#b25e00,color:#1b1640
+  classDef task fill:#ffffff,stroke:#1b1446,color:#1b1640
+  classDef doc fill:#e2edfd,stroke:#1f5fbf,color:#1b1640
+
+  subgraph G["Garagiste (tablette)"]
+    direction LR
+    g0(("1) Batterie HS")):::evt --> g1["Scanner le QR<br/>Diagnostic"]:::task --> g2["Signaler hors d'usage<br/>(type de défaut)"]:::task
+    g3["4) Préparer la batterie<br/>bornes protégées"]:::task --> g4["4) Remettre au transporteur<br/>contre scellé"]:::task
+  end
+
+  subgraph P["Propriétaire du Battery Passport (desktop)"]
+    direction LR
+    p1{"Valider ?"}:::gate
+    p1 -- non --> p0["Refus motivé"]:::task
+    p1 -- oui --> p2["2) Original → Waste<br/>Choisir centre agréé*"]:::task
+    p2 --> d1[/"Ordre de transfert<br/>classe ADR, poids"/]:::doc
+    p3["3) Planifier collecte<br/>transporteur + créneau"]:::task
+    p5{"Refus à réception ?"}:::gate
+    p5 -- oui --> p6["Rediriger vers<br/>un autre centre"]:::task
+    p7["Annuler<br/>(avant enlèvement)"]:::task
+  end
+
+  subgraph T["Transporteur agréé ADR (mobile)"]
+    direction LR
+    t1["Mission notifiée (tournée)"]:::task --> t2["5) Scanner au garage<br/>poser scellé, peser,<br/>4 contrôles ADR"]:::task --> d2[/"Étiquette QR<br/>UN 3480 classe 9"/]:::doc
+    t3["5) Acheminer vers le centre"]:::task
+  end
+
+  subgraph C["Centre de tri (mobile)"]
+    direction LR
+    c1["Scanner le QR<br/>statut = Waste ?"]:::task --> c2{"Scellé identique<br/>+ emballage intact ?"}:::gate
+    c2 -- oui --> c3["6) Peser, accuser réception"]:::task --> d3[/"Preuve de dépôt<br/>manifeste signé"/]:::doc --> c4(("6) Batterie au<br/>centre de tri")):::evt
+    c2 -- non --> c5["Refuser (motif)"]:::task
+  end
+
+  g2 -- "notification" --> p1
+  d1 -- "notif. garage + centre" --> p3
+  p3 -- "notif. transporteur,<br/>garage, centre" --> t1
+  g3 -.-> t2
+  t2 --> g4
+  d2 --> t3 --> c1
+  c5 -- "notif." --> p5
+  p6 -- "même scellé" --> c1
+  d3 -- "notif. propriétaire,<br/>garage, transporteur" --> P

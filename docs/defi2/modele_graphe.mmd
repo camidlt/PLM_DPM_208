@@ -1,0 +1,22 @@
+flowchart LR
+  classDef core fill:#ffffff,stroke:#1b1446,color:#1b1640
+  classDef new fill:#fde5f0,stroke:#e5267a,color:#1b1640
+  EO["EconomicOperator"]:::core -- BUILD --> B["BatteryInstance<br/>status"]:::core
+  OW["Actor<br/>proprietaire"]:::core -- REPRESENTS --> EO
+  GA["Actor<br/>garagiste"]:::core
+  CT["Actor centre_tri<br/>agreed, agreementValidUntil,<br/>acceptsDamaged"]:::core
+  TR["Actor transporteur<br/>agreed, adr, damagedCapable,<br/>agreementValidUntil"]:::new
+  N["Notification<br/>PENDING/APPROVED/REJECTED"]:::core -- TRIGGERED --> TO
+  TO["TransferOrder<br/>state, damageClass, adrPacking,<br/>pickupDate, sealNumber,<br/>pickup/receptionWeightKg,<br/>receiptCode, supersededBy"]:::new
+  TO -- FOR --> B
+  TO -- FROM --> GA
+  TO -- TO --> CT
+  TO -- ASSIGNED_TO --> TR
+  TO -- HAS_STEP --> S["LogisticsStep<br/>seq, type, at, dataJson,<br/>prevHash, hash"]:::new
+  OW & TR & CT -- PERFORMED --> S
+  S -. "prevHash" .-> S
+  B -- LOCATED_AT --> GA
+  B -. "LOCATED_AT (en transit)" .-> TR
+  B -. "LOCATED_AT (reçue)" .-> CT
+  B -- HAS_EVENT --> E["Event<br/>TRANSFER_SCHEDULED, PICKED_UP,<br/>RECEIVED, RECEPTION_REFUSED…"]:::core
+  M["Message<br/>subject, body, channel, read"]:::new -- SENT_TO --> OW & GA & TR & CT
