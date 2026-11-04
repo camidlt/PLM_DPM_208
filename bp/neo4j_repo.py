@@ -166,6 +166,21 @@ class Neo4jRepo:
         self._write("MATCH (d:MarketDemand {uid: $uid}) SET d.active = $active",
                      uid=demand_uid, active=bool(active))
 
+    def add_demand(self, center_uid, title, option, partner, chemistries, min_soce, urgency, quantity=1, location="France"):
+        uid = new_uid("DEM")
+        self._write("""
+            MATCH (actor:Actor {uid: $center_uid})
+            CREATE (d:MarketDemand {uid: $uid, title: $title, option: $option, partner: $partner,
+                    chemistries: $chemistries, minSoce: $min_soce, urgency: $urgency,
+                    quantity: $quantity, location: $location, active: true})
+            CREATE (d)-[:OFFERED_TO]->(actor)
+            """, center_uid=center_uid, uid=uid, title=title, option=option, partner=partner,
+            chemistries=chemistries, min_soce=min_soce, urgency=urgency, quantity=quantity, location=location)
+        return uid
+
+    def delete_demand(self, demand_uid):
+        self._write("MATCH (d:MarketDemand {uid: $uid}) DETACH DELETE d", uid=demand_uid)
+
     def get_center_policy(self, center_uid):
         rows = self._read("MATCH (c:Actor {uid: $uid}) RETURN coalesce(c.policyMarket, true) AS m, "
                           "coalesce(c.policyHierarchy, true) AS h", uid=center_uid)

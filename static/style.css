@@ -328,6 +328,9 @@ dialog.doc-modal::backdrop {
 .fit-ok { color: #15803d; font-weight: 700; margin-top: 3px; }
 .fit-ko { color: #dc2626; font-weight: 700; margin-top: 3px; }
 .mismatch-tag { color: #b91c1c; background: #fee2e2; border: 1px solid #fca5a5; padding: 1px 6px; border-radius: 4px; font-weight: 800; font-size: .82rem; display: inline-block; }
+.btn-del { background: transparent; border: 1px solid var(--line); color: var(--muted); cursor: pointer; padding: 4px 8px; border-radius: 8px; font-size: 1rem; line-height: 1.2; }
+.btn-del:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+.add-demand-box input, .add-demand-box select { width: 100%; box-sizing: border-box; }
 .switch { flex: none; width: 52px; height: 30px; border-radius: 999px; border: 0; background: #cfcce0; position: relative; cursor: pointer; padding: 0; }
 .switch span { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff;
                box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .15s; }

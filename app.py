@@ -333,6 +333,55 @@ def tri_market_toggle(user, demand_uid):
     return redirect(url_for("tri_market"))
 
 
+@app.route("/tri/market/add", methods=["POST"])
+@login_required("centre_tri")
+def tri_market_add(user):
+    title = request.form.get("title", "").strip()
+    option = request.form.get("option", "Repurpose")
+    partner = request.form.get("partner", "").strip() or "Partenaire industriel"
+    urgency = request.form.get("urgency", "normale")
+    location = request.form.get("location", "").strip() or "France"
+    try:
+        min_soce = int(request.form.get("min_soce", 60))
+    except (ValueError, TypeError):
+        min_soce = 60
+    try:
+        quantity = int(request.form.get("quantity", 10))
+    except (ValueError, TypeError):
+        quantity = 10
+    chems = request.form.getlist("chemistries")
+    if not chems:
+        chems = ["NMC 811", "LFP"]
+
+    if not title:
+        flash("Le titre de la demande est obligatoire.", "error")
+    else:
+        repo.add_demand(center_uid=user["actor_uid"], title=title, option=option,
+                        partner=partner, chemistries=chems, min_soce=min_soce,
+                        urgency=urgency, quantity=quantity, location=location)
+        flash(f"Demande « {title} » ajoutée au catalogue du marché.", "success")
+    back = request.form.get("back", "")
+    if back and back.startswith("/tri/"):
+        return redirect(back)
+    return redirect(url_for("tri_market"))
+
+
+@app.route("/tri/market/<demand_uid>/delete", methods=["POST"])
+@login_required("centre_tri")
+def tri_market_delete(user, demand_uid):
+    demands = {d["uid"]: d for d in repo.list_demands()}
+    if demand_uid in demands:
+        title = demands[demand_uid]["title"]
+        repo.delete_demand(demand_uid)
+        flash(f"Demande « {title} » retirée du catalogue du marché.", "success")
+    else:
+        flash("Demande introuvable.", "error")
+    back = request.form.get("back", "")
+    if back and back.startswith("/tri/"):
+        return redirect(back)
+    return redirect(url_for("tri_market"))
+
+
 # --- API JSON (pour les défis 1 et 3, et les notifications) --------------------------
 @app.route("/api/battery/<battery_id>")
 @login_required()
