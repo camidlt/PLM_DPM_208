@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Garagiste</title><link rel="stylesheet" href="/app/common.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script></head>
+<body>
+<header><h1>🔧 Diagnostic batterie</h1><span class="role">Rôle : Garagiste · <a href="/" style="color:var(--muted)">changer</a></span></header>
+<main>
+  <div id="alerts"></div>
+  <div class="grid2">
+    <div class="card"><h2>Identification</h2><div id="id"></div></div>
+    <div class="card"><h2>Action</h2>
+      <p class="muted" id="fresh"></p>
+      <textarea id="comment" rows="2" placeholder="Commentaire (optionnel)"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button id="report" disabled>Signaler au propriétaire : batterie hors d'usage</button>
+      </div>
+      <p class="muted" id="reportHint">Le bouton s'active quand un module est en défaut critique.</p>
+    </div>
+  </div>
+  <div class="card"><h2>Résistance interne des 5 modules (BMS)</h2><div class="modules" id="modules"></div></div>
+  <div class="card"><h2>Évolution de la résistance interne</h2><canvas id="chart" height="90"></canvas></div>
+  <div class="card"><h2>Historique du passeport</h2><div id="events"></div></div>
+</main>
+<script src="/app/common.js"></script>
+<script>
+  const colors = ["#39d0ff", "#2ee59d", "#ff4fd8", "#ffb020", "#b18cff"];
+  let chart, reported = false;
+
+  async function refresh() {
+    const p = await api(`/api/batteries/${BID}`);
+    document.getElementById("id").innerHTML = identity(p);
+    document.getElementById("modules").innerHTML = moduleCards(p);
+    document.getElementById("events").innerHTML = timeline(p.events);
+    const last = p.modules.map(m => m.lastTs).filter(Boolean).sort().pop();
+    document.getElementById("fresh").textContent = `Dernière mesure BMS : ${ago(last)}`;
+    const open = p.alerts.filter(a => a.open);
+    document.getElementById("alerts").innerHTML = open.map(a =>
+      `<div class="alert">🚨 <b>ALERTE CRITIQUE</b> — ${a.message}<br><span class="muted">${fmtTs(a.ts)}${a.reportedAt ? " · remontée au propriétaire" : ""}</span></div>`).join("");
+    const critical = p.modules.some(m => m.health === "CRITICAL") || open.length > 0;
+    reported = p.events.some(e => e.type === "DIAGNOSIS_REPORTED");
+    const btn = document.getElementById("report");
+    btn.disabled = !critical || reported || p.battery.status === "Waste";
+    document.getElementById("reportHint").textContent = reported
+      ? "✅ Diagnostic transmis au propriétaire du Battery Passport."
+      : critical ? "Module(s) non réparable(s) : remontez l'information au propriétaire."
+                 : "Le bouton s'active quand un module est en défaut critique.";
+
+    const h = await api(`/api/batteries/${BID}/history?limit=40`);
+    const rmax = p.staticPerformance?.maxInternalResistance || 25;
+    const labels = (h[0]?.points || []).map(x => new Date(x.ts).toLocaleTimeString("fr-FR"));
+    const datasets = h.map((m, k) => ({ label: `Module ${m.position}`, data: m.points.map(x => x.internalResistance),
+      borderColor: colors[k], tension: .25, pointRadius: 0 }));
+    datasets.push({ label: "Max constructeur", data: labels.map(() => rmax), borderColor: "#ff4d5e", borderDash: [6, 4], pointRadius: 0 });
+    if (!chart) chart = new Chart(document.getElementById("chart"), { type: "line", data: { labels, datasets },
+      options: { animation: false, scales: { y: { title: { display: true, text: "mΩ" }, ticks: { color: "#a99fd6" } },
+                 x: { ticks: { color: "#a99fd6", maxTicksLimit: 8 } } }, plugins: { legend: { labels: { color: "#f1edff" } } } } });
+    else { chart.data.labels = labels; chart.data.datasets = datasets; chart.update(); }
+  }
+
+  document.getElementById("report").onclick = async () => {
+    try {
+      await api(`/api/batteries/${BID}/report`, { method: "POST", role: "garagiste",
+        body: { by: "Garage Hill Valley", comment: document.getElementById("comment").value } });
+      toast("Notification envoyée au propriétaire du Battery Passport");
+      refresh();
+    } catch (e) { toast(e.message); }
+  };
+  refresh(); setInterval(() => refresh().catch(console.error), 2000);
+</script>
+</body></html>

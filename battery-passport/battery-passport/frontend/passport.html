@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Battery Passport</title><link rel="stylesheet" href="/app/common.css"></head>
+<body>
+<header><h1>⚡ Battery Passport</h1><span class="role">Battery to the Future</span></header>
+<main>
+  <div class="grid2">
+    <div class="card"><h2>Passeport</h2><div id="id">Chargement…</div></div>
+    <div class="card"><h2>QR code de la batterie</h2>
+      <img id="qr" alt="QR code" style="width:200px;background:#fff;border-radius:10px;padding:8px">
+      <p class="muted">À imprimer / afficher : il ouvre cette page sur le téléphone.</p></div>
+  </div>
+  <div class="card"><h2>Fiche technique (données du passeport)</h2><div id="tech"></div></div>
+  <div class="card roles"><h2>Qui êtes-vous ?</h2>
+    <a id="g">🔧 Garagiste — diagnostic &amp; télémétrie (tablette)</a>
+    <a id="o">🏭 Propriétaire du Battery Passport — statut (desktop)</a>
+    <a id="r">♻️ Centre de tri — réception &amp; recyclage (mobile)</a>
+  </div>
+  <div class="card"><h2>Toutes les batteries de la base</h2><div id="list"></div></div>
+</main>
+<script src="/app/common.js"></script>
+<script>
+  const bid = location.pathname.split("/").pop() || "DLR-1985";
+  document.getElementById("qr").src = `/qr/${bid}.png`;
+  for (const [k, page] of [["g","garagiste"],["o","owner"],["r","recycler"]])
+    document.getElementById(k).href = `/app/${page}.html?id=${bid}`;
+  api(`/api/batteries/${bid}`).then(p => {
+      document.getElementById("id").innerHTML = identity(p);
+      document.getElementById("tech").innerHTML = techSheet(p);
+    })
+    .catch(e => document.getElementById("id").textContent = e.message);
+  api("/api/batteries").then(list => document.getElementById("list").innerHTML = `<div class="kv">${list.map(x =>
+    `<span><a href="/passport/${x.batteryId}" style="color:var(--accent2)">${x.batteryId}</a></span>
+     <span>${statusBadge(x.status)} ${x.model} · ${x.holder || ""} · SOCE ${x.soce ?? "—"} %${x.criticalModules ? " · 🚨" : ""}</span>`).join("")}</div>`);
+</script>
+</body></html>
