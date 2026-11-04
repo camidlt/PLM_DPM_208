@@ -95,7 +95,7 @@ class Neo4jRepo:
             OPTIONAL MATCH (b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp)
             OPTIONAL MATCH (b)-[:LOCATED_AT]->(l:Actor)
             RETURN b.batteryId AS batteryId, b.status AS status, m.name AS model,
-                   dp.soh AS soh, l.name AS location
+                   coalesce(dp.soh, dp.soce) AS soh, coalesce(l.name, b.manufacturingPlace, 'Non assigné') AS location
             ORDER BY batteryId""")]
 
     def get_passport(self, battery_id):
@@ -104,10 +104,20 @@ class Neo4jRepo:
             return None
         p = rows[0].data()
         p["dynamic_performance"] = p["dynamic_performance"] or {}
+        if "soh" not in p["dynamic_performance"] and "soce" in p["dynamic_performance"]:
+            p["dynamic_performance"]["soh"] = p["dynamic_performance"]["soce"]
         p["dynamic_durability"] = p["dynamic_durability"] or {}
-        p["modules"] = [r["m"] for r in self._read(
+        raw_modules = [r["m"] for r in self._read(
             "MATCH (:BatteryInstance {batteryId: $id})-[:HAS_MODULE]->(m:Module) "
-            "RETURN m{.*} AS m ORDER BY m.index", id=battery_id)]
+            "RETURN m{.*} AS m ORDER BY coalesce(m.index, m.position)", id=battery_id)]
+        for mod in raw_modules:
+            if "index" not in mod and "position" in mod:
+                mod["index"] = mod["position"]
+            if "internalResistance_mOhm" not in mod and "lastResistance" in mod:
+                mod["internalResistance_mOhm"] = mod["lastResistance"]
+            elif "internalResistance_mOhm" not in mod and "initialInternalResistance" in mod:
+                mod["internalResistance_mOhm"] = mod["initialInternalResistance"]
+        p["modules"] = raw_modules
         pending = self._read(
             "MATCH (n:Notification {state: 'PENDING'})-[:ABOUT]->(:BatteryInstance {batteryId: $id}) "
             "WITH n LIMIT 1" + NOTIF_RETURN, id=battery_id)

@@ -1,164 +1,191 @@
 // =====================================================================
-// Battery Passport – jeu de données de démo (aucun dump fourni : données construites par l'équipe)
-// Respecte le modèle Capgemini (Figure 1 du sujet). Les EXTENSIONS de l'équipe sont marquées ★.
-// Idempotent : MERGE + ON CREATE pour les données qui évoluent (statut, SOC…), on peut relancer.
-//
-// Sources des ordres de grandeur : Règlement (UE) 2023/1542 Annexe XIII (contenu du passeport),
-// fiches techniques publiques de cellules NMC/LFP. Les entreprises et personnes sont FICTIVES.
+// GRAPHE COMPLET – Partie 1/2 : données d'exemple (batterie de Doc, DLR-1985)
+// Modèle Capgemini (Figure 1) + les 50 attributs retenus dans la sélection par rôle.
+// [#n] = numéro dans l'Excel Battery Pass · ★ = ajout de l'équipe
+// Avant : MATCH (n) DETACH DELETE n
+// =====================================================================
+CREATE
+// ---------------- Fabricant / opérateur ----------------
+(company:Company {name: 'Doc Brown Industries', manufacturerId: 'MFR-FR-0001'}),                    // [#4]
+(type:Type {name: 'Electric Vehicle Battery'}),                                                      // [#9]
+(eo:EconomicOperator {operatorId: 'OP-FR-1985', name: 'DeLorean Motor Company',                      // [#3]
+   address: '1640 Riverside Drive, Hill Valley', country: 'FR', email: 'passport@dmc.example',
+   phone: '+33 1 85 19 85 00', weblink: 'https://dmc.example'}),
+
+// ---------------- Modèle + données statiques ----------------
+(model:Model {modelId: 'FC-88', name: 'Flux Capacitor Pack FC-88 (75 kWh)',
+   manufacturingPlace: 'Hill Valley Gigafactory (FR)',                                               // ★ [#5]
+   batteryMass: 478}),                                                                               // ★ [#10] kg
+(cert:Certification {separateCollectionSymbol: 'Poubelle barrée (EN IEC 62902)',                    // [#12]
+   EUDeclarationOfConformityId: 'EU-DoC-FC-88-2026',                                                 // [#17]
+   EUDeclarationOfConformity: 'https://docs.example/FC-88/eu-declaration-of-conformity.pdf'}),
+(circ:Circularity {extinguishAgent: 'Eau en grande quantité',                                        // [#15]
+   partNumbers: 'https://docs.example/FC-88/part-numbers',                                           // [#37]
+   dismantlingInformation: 'https://docs.example/FC-88/dismantling-manual.pdf',                      // ★ [#36]
+   sparePartsSources: 'https://docs.example/FC-88/spare-parts-sources',                              // ★ [#38]
+   safetyMeasures: 'https://docs.example/FC-88/safety-measures.pdf',                                 // ★ [#39]
+   endOfLifeInformation: 'https://docs.example/FC-88/collection-second-life-eol.pdf',                // ★ [#51]
+   recycledNickelShare: 6.0, recycledCobaltShare: 16.0, recycledLithiumShare: 6.0,                   // ★ [#44-46] %
+   recycledLeadShare: 0.0, renewableContentShare: 2.0}),                                             // ★ [#47] [#48] %
+(sp:StaticPerformance {minimalVoltage: 280.0, nominalVoltage: 355.0, maximalVoltage: 403.0,          // [#59-61] V
+   ratedCapacity: 211,                                                                               // ★ [#52] Ah
+   initialInternalResistancePack: 40.0, initialInternalResistanceModule: 8.0,                        // ★ [#74] mΩ
+   initialInternalResistanceCell: 1.2,
+   maxInternalResistance: 25.0, internalResistanceUnit: 'mOhm'}),                                    // ★ seuil défi 1
+(sd:StaticDurability {expectedBatteryLifetimeCycles: 2000,                                           // [#77]
+   cRateRelevantCycleLifeTest: 1.0,                                                                  // socle Capgemini
+   capacityThresholdForExhaustion: 70.0}),                                                           // ★ [#83] %
+(cf:CarbonFootprint {carbonFootprintDeclared: 61.5, unit: 'kg CO2e / kWh',                           // [#19]
+   performanceClass: 'B',                                                                            // [#24]
+   linkStudy: 'https://docs.example/FC-88/carbon-footprint-study.pdf'}),                             // socle Capgemini
+
+// ---------------- Composition ----------------
+(comp:Composition {composition_id: 'FC-88-COMP', batteryChemistry: 'NMC 811 / Graphite-Si',          // [#31]
+   criticalRawMaterials: ['Lithium', 'Nickel', 'Cobalt', 'Manganese', 'Natural graphite'],           // ★ [#32]
+   hazardousSubstances: ['LiPF6 (électrolyte, dégage du HF en cas de feu)', 'Composés de cobalt', 'Composés de nickel']}),  // ★ [#34]
+(anode:Anode {anodeId: 'FC-88-AN', anodeMaterialsList: ['Graphite', 'Silicon oxide', 'Copper foil', 'Binder (SBR/CMC)'],  // [#33]
+   percentageList: [86, 6, 6, 2], isRenewable: [false, false, false, false]}),
+(cathode:Cathode {cathodeId: 'FC-88-CA', cathodeMaterialsList: ['LiNi0.8Mn0.1Co0.1O2', 'Aluminium foil', 'Carbon black', 'PVDF binder'],
+   percentageList: [90, 5, 3, 2], isRenewable: [false, false, false, false]}),
+(electrolyte:Electrolyte {electrolyteId: 'FC-88-EL', electrolyteMaterialsList: ['LiPF6', 'Ethylene carbonate', 'Ethyl methyl carbonate', 'Additives (VC/FEC)'],
+   percentageList: [13, 30, 52, 5], isRenewable: [false, false, false, false]}),
+
+// ---------------- Batterie de Doc + données dynamiques ----------------
+(b:BatteryInstance {batteryPassportId: 'BP-DLR-1985', batteryId: 'DLR-1985',                        // [#1] [#2]
+   serialNumber: 'FC88-25-001985',                                                                   // ★ [#2]
+   manufacturingDate: '2025-10', dateOfPuttingIntoService: '2025-11',                                // ★ [#6] [#7]
+   status: 'Waste'}),                                                                                // [#11] après le workflow
+(dp:DynamicPerformance {soce: 71, soc: 64,                                                           // [#57] [#58] %
+   capacityFade: 29.0,                                                                               // ★ [#54] %
+   remainingPowerCapability: 167000, powerFade: 33.0,                                                // ★ [#63] W, [#64] %
+   internalResistanceIncrease: 481.3}),                                                              // ★ [#75] % (pire module)
+(dd:DynamicDurability {warranty: '2033-10',                                                          // [#8]
+   numberOfFullCycles: 640,                                                                          // ★ [#78]
+   temperatureInformation: 44,                                                                       // ★ [#84] °C
+   timeExtremeTempAbove: 540, timeExtremeTempBelow: 0,                                               // ★ [#87] [#88] min
+   deepDischargeEvents: 3, overchargeEvents: 1,                                                      // ★ [#91] [#92]
+   accidents: 'Aucun accident déclaré'}),                                                            // [#93]
+
+// ---------------- ★ DÉFI 1 : modules, mesures BMS, alerte ----------------
+(m1:Module {moduleId: 'DLR-1985-M1', position: 1, initialInternalResistance: 8.0, lastResistance: 7.9, internalResistanceIncrease: -1.3, health: 'OK'}),
+(m2:Module {moduleId: 'DLR-1985-M2', position: 2, initialInternalResistance: 8.0, lastResistance: 8.2, internalResistanceIncrease: 2.5, health: 'OK'}),
+(m3:Module {moduleId: 'DLR-1985-M3', position: 3, initialInternalResistance: 8.0, lastResistance: 46.5, internalResistanceIncrease: 481.3, health: 'CRITICAL'}),
+(m4:Module {moduleId: 'DLR-1985-M4', position: 4, initialInternalResistance: 8.0, lastResistance: 8.0, internalResistanceIncrease: 0.0, health: 'OK'}),
+(m5:Module {moduleId: 'DLR-1985-M5', position: 5, initialInternalResistance: 8.0, lastResistance: 8.4, internalResistanceIncrease: 5.0, health: 'OK'}),
+(x1:Measurement {ts: '2026-11-04T10:15:00Z', voltage: 3.603, current: 12.0, internalResistance: 8.1, temperature: 28.0}),
+(x2:Measurement {ts: '2026-11-04T10:15:02Z', voltage: 3.460, current: 12.0, internalResistance: 20.0, temperature: 37.2}),
+(x3:Measurement {ts: '2026-11-04T10:15:04Z', voltage: 3.142, current: 12.0, internalResistance: 46.5, temperature: 44.4}),
+(alert:Alert {level: 'CRITICAL', ts: '2026-11-04T10:15:08Z', value: 46.5, threshold: 25.0, open: true,
+   message: 'Module 3 : résistance interne 46.5 mΩ > max constructeur 25 mΩ'}),
+(diagG:Diagnosis {type: 'GARAGE', ts: '2026-11-04T10:20:00Z', by: 'Garage Hill Valley',
+   verdict: 'Non réparable sur place – demande de passage en Waste'}),
+
+// ---------------- ★ DÉFI 3 : centre de tri, débouchés, décision ----------------
+(sc:SortingCenter {name: 'Centre de tri Hill Valley', accredited: true,
+   accreditation: 'Installation agréée pour le traitement des batteries usagées'}),
+(diagS:Diagnosis {type: 'SORTING_CENTER', ts: '2026-11-05T09:00:00Z', by: 'Centre de tri Hill Valley',
+   visualDamage: false, swelling: true, leakage: false, corrosion: false,
+   verdict: 'Module 3 gonflé et hors tolérance ; modules 1, 2, 4, 5 sains'}),
+(p1:Partner {name: 'Voltaire Second Life', kind: 'Second-life integrator', accredited: true}),
+(p2:Partner {name: 'ReCell Atelier', kind: 'Remanufacturer', accredited: true}),
+(p3:Partner {name: 'Hill Valley Recycling', kind: 'Recycler', accredited: true}),
+(md1:MarketDemand {demandId: 'MD-A6', useCase: 'Stockage pour bornes de recharge – aire d’autoroute A6', path: 'Repurpose',
+   minSoce: 60, maxIrIncrease: 50, quantity: 12, urgency: 'HIGH', deadline: '2026-12-15', open: true}),
+(md2:MarketDemand {demandId: 'MD-REMAN-FC88', useCase: 'Packs FC-88 reconditionnés (remplacement de modules)', path: 'Remanufacture',
+   minSoce: 60, maxIrIncrease: 50, quantity: 5, urgency: 'LOW', deadline: '2027-06-30', open: true}),
+(md3:MarketDemand {demandId: 'MD-NICO', useCase: 'Récupération nickel et cobalt (hydrométallurgie)', path: 'Recycle',
+   minSoce: 0, quantity: 1000, urgency: 'LOW', deadline: '2027-12-31', open: true}),
+(dm:DecisionMatrix {matrixId: 'DM-v1', version: 1, wMarket: 0.10}),
+(reco:Recommendation {ts: '2026-11-05T09:05:00Z', eliminatoryRuleTriggered: false,
+   scoreReuse: 0.12, scoreRepurpose: 0.74, scoreRemanufacture: 0.66, scoreRecycle: 0.48,
+   chosenPath: 'Repurpose', decidedBy: 'Centre de tri Hill Valley',
+   justification: 'Aucune règle éliminatoire (#91 = 3, #92 = 1, #93 aucun accident). SOCE 71 % (#57) au-dessus du seuil de 70 % (#83), mais perte de puissance 33 % (#64) : Reuse en véhicule pénalisé. 1 module sur 5 hors seuil (#75) : Remanufacture possible (#36-38 disponibles). Demande urgente MD-A6 : Repurpose des 4 modules sains, module 3 vers MD-NICO.'}),
+
+// ---------------- Relations du modèle Capgemini ----------------
+(company)-[:HAS_TYPE]->(type),
+(company)-[:HAS_ECONOMIC_OPERATOR]->(eo),
+(type)-[:HAS_MODEL]->(model),
+(model)-[:HAS_CERTIFICATION]->(cert),
+(model)-[:HAS_CIRCULARITY]->(circ),
+(model)-[:HAS_STATIC_PERFORMANCE]->(sp),
+(model)-[:HAS_STATIC_DURABILITY]->(sd),
+(model)-[:HAS_COMPOSITION]->(comp),
+(model)-[:HAS_CARBON_FOOTPRINT]->(cf),
+(eo)-[:HAS_CARBON_FOOTPRINT]->(cf),
+(model)-[:HAS_BATTERY_INSTANCE]->(b),
+(eo)-[:BUILD]->(b),
+(comp)-[:HAS_ANODE]->(anode),
+(comp)-[:HAS_CATHODE]->(cathode),
+(comp)-[:HAS_ELECTROLYTE]->(electrolyte),
+(b)-[:HAS_DYNAMIC_DURABILITY]->(dd),
+(b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp),
+
+// ---------------- ★ Relations défi 1 ----------------
+(b)-[:HAS_MODULE]->(m1), (b)-[:HAS_MODULE]->(m2), (b)-[:HAS_MODULE]->(m3), (b)-[:HAS_MODULE]->(m4), (b)-[:HAS_MODULE]->(m5),
+(m3)-[:HAS_MEASUREMENT]->(x1), (m3)-[:HAS_MEASUREMENT]->(x2), (m3)-[:HAS_MEASUREMENT]->(x3),
+(m3)-[:LATEST]->(x3),
+(m3)-[:RAISED]->(alert),
+(b)-[:HAS_DIAGNOSIS]->(diagG),
+(diagG)-[:CONCERNS]->(m3),
+(diagG)-[:BASED_ON]->(alert),
+
+// ---------------- ★ Relations défi 3 ----------------
+(sc)-[:RECEIVED {ts: '2026-11-05T08:30:00Z', statusChecked: 'Waste'}]->(b),
+(b)-[:HAS_DIAGNOSIS]->(diagS),
+(diagS)-[:CONCERNS]->(m3),
+(sc)-[:HAS_PARTNER]->(p1), (sc)-[:HAS_PARTNER]->(p2), (sc)-[:HAS_PARTNER]->(p3),
+(p1)-[:EXPRESSES]->(md1), (p2)-[:EXPRESSES]->(md2), (p3)-[:EXPRESSES]->(md3),
+(sc)-[:USES]->(dm),
+(b)-[:HAS_RECOMMENDATION]->(reco),
+(reco)-[:USED_MATRIX]->(dm),
+(reco)-[:BASED_ON]->(diagS),
+(reco)-[:BASED_ON]->(dp),
+(reco)-[:MATCHES]->(md1);
+
+
+// =====================================================================
+// PARTIE 2/2 – Rôles, catalogue des attributs et droits d'accès (copie de attributes.cypher)
 // =====================================================================
 
-CREATE CONSTRAINT battery_id IF NOT EXISTS FOR (b:BatteryInstance) REQUIRE b.batteryId IS UNIQUE;
-CREATE CONSTRAINT model_id IF NOT EXISTS FOR (m:Model) REQUIRE m.modelId IS UNIQUE;
-CREATE CONSTRAINT module_id IF NOT EXISTS FOR (m:Module) REQUIRE m.moduleId IS UNIQUE;
-CREATE CONSTRAINT company_name IF NOT EXISTS FOR (c:Company) REQUIRE c.name IS UNIQUE;
-CREATE CONSTRAINT operator_name IF NOT EXISTS FOR (o:EconomicOperator) REQUIRE o.name IS UNIQUE;
+// GÉNÉRÉ par tools/gen_attributes.py depuis l'Excel de sélection par rôle – ne pas éditer à la main
 
-// ---------------------------------------------------------------------
-// 1) Fabricants, opérateurs économiques, types
-// ---------------------------------------------------------------------
+CREATE CONSTRAINT attr_num IF NOT EXISTS FOR (a:AttributeDef) REQUIRE a.num IS UNIQUE;
+
+CREATE CONSTRAINT role_code IF NOT EXISTS FOR (r:Role) REQUIRE r.code IS UNIQUE;
+
 UNWIND [
-  {company: 'Doc Brown Industries', operator: 'DeLorean Motor Company',
-   address: '1640 Riverside Drive, Hill Valley', country: 'FR', email: 'passport@dmc.example',
-   phone: '+33 1 85 19 85 00', weblink: 'https://dmc.example'},
-  {company: 'Hill Valley Energy', operator: 'HVE Manufacturing Europe',
-   address: 'ZI des Lumières, 59000 Lille', country: 'FR', email: 'compliance@hve.example',
-   phone: '+33 3 20 20 15 00', weblink: 'https://hve.example'},
-  {company: 'Mr. Fusion Mobility', operator: 'Mr. Fusion GmbH',
-   address: 'Energiestraße 12, 70173 Stuttgart', country: 'DE', email: 'bp@mrfusion.example',
-   phone: '+49 711 1955 000', weblink: 'https://mrfusion.example'}
-] AS d
-MERGE (c:Company {name: d.company})
-MERGE (o:EconomicOperator {name: d.operator})
-SET o.address = d.address, o.country = d.country, o.email = d.email, o.phone = d.phone, o.weblink = d.weblink
-MERGE (c)-[:HAS_ECONOMIC_OPERATOR]->(o);
+  {code: 'public', name: 'Grand public (QR sans connexion)', goal: 'S’informer : uniquement des attributs Public'},
+  {code: 'garagiste', name: 'Garagiste', goal: 'Diagnostiquer : est-ce que je peux réparer ?'},
+  {code: 'owner', name: 'Propriétaire du Battery Passport', goal: 'Valider le passage en Waste et organiser le transfert'},
+  {code: 'recycler', name: 'Centre de tri', goal: 'Réceptionner, puis décider Reuse / Remanufacture / Repurpose / Recycle'}
+] AS r
+MERGE (x:Role {code: r.code}) SET x.name = r.name, x.goal = r.goal;
 
-// ---------------------------------------------------------------------
-// 2) Modèles de batterie + toutes leurs données statiques
-// ---------------------------------------------------------------------
-UNWIND [
-  {modelId: 'FC-88', name: 'Flux Capacitor Pack FC-88 (75 kWh)', company: 'Doc Brown Industries',
-   operator: 'DeLorean Motor Company', type: 'Electric Vehicle Battery',
-   chemistry: 'NMC 811 / Graphite-Si', minV: 280.0, nomV: 355.0, maxV: 403.0, maxIR: 25.0,
-   cycles: 2000, cRate: 1.0, cf: 61.5, cfClass: 'B', extinguish: 'Water (large quantities) – Class D not required',
-   anode: ['Graphite', 'Silicon oxide', 'Copper foil', 'Binder (SBR/CMC)'], anodePct: [86, 6, 6, 2], anodeRen: [false, false, false, false],
-   cathode: ['LiNi0.8Mn0.1Co0.1O2', 'Aluminium foil', 'Carbon black', 'PVDF binder'], cathodePct: [90, 5, 3, 2], cathodeRen: [false, false, false, false],
-   electrolyte: ['LiPF6', 'Ethylene carbonate', 'Ethyl methyl carbonate', 'Additives (VC/FEC)'], electrolytePct: [13, 30, 52, 5], electrolyteRen: [false, false, false, false]},
-  {modelId: 'HV-LFP-60', name: 'Hoverboard LFP Pack HV-60 (60 kWh)', company: 'Hill Valley Energy',
-   operator: 'HVE Manufacturing Europe', type: 'Electric Vehicle Battery',
-   chemistry: 'LFP / Graphite', minV: 250.0, nomV: 320.0, maxV: 365.0, maxIR: 20.0,
-   cycles: 3500, cRate: 1.0, cf: 48.2, cfClass: 'A', extinguish: 'Water / foam',
-   anode: ['Graphite', 'Copper foil', 'Binder (SBR/CMC)'], anodePct: [91, 7, 2], anodeRen: [false, false, false],
-   cathode: ['LiFePO4', 'Aluminium foil', 'Carbon black', 'PVDF binder'], cathodePct: [88, 6, 4, 2], cathodeRen: [false, false, false, false],
-   electrolyte: ['LiPF6', 'Ethylene carbonate', 'Dimethyl carbonate'], electrolytePct: [12, 44, 44], electrolyteRen: [false, false, false]},
-  {modelId: 'MF-48', name: 'Mr. Fusion e-Bike Pack MF-48 (0,75 kWh)', company: 'Mr. Fusion Mobility',
-   operator: 'Mr. Fusion GmbH', type: 'Light Means of Transport Battery',
-   chemistry: 'NMC 622 / Graphite', minV: 39.0, nomV: 48.0, maxV: 54.6, maxIR: 60.0,
-   cycles: 1000, cRate: 0.5, cf: 72.0, cfClass: 'C', extinguish: 'Water / sand',
-   anode: ['Graphite', 'Copper foil', 'Binder'], anodePct: [90, 8, 2], anodeRen: [false, false, false],
-   cathode: ['LiNi0.6Mn0.2Co0.2O2', 'Aluminium foil', 'Carbon black', 'PVDF binder'], cathodePct: [89, 6, 3, 2], cathodeRen: [false, false, false, false],
-   electrolyte: ['LiPF6', 'Ethylene carbonate', 'Diethyl carbonate'], electrolytePct: [12, 40, 48], electrolyteRen: [false, false, false]},
-  {modelId: 'CT-200', name: 'Clocktower Storage Unit CT-200 (200 kWh)', company: 'Hill Valley Energy',
-   operator: 'HVE Manufacturing Europe', type: 'Industrial Battery',
-   chemistry: 'LFP / Graphite', minV: 672.0, nomV: 768.0, maxV: 876.0, maxIR: 18.0,
-   cycles: 6000, cRate: 0.5, cf: 45.0, cfClass: 'A', extinguish: 'Water / aerosol system',
-   anode: ['Graphite', 'Copper foil', 'Binder (SBR/CMC)'], anodePct: [91, 7, 2], anodeRen: [false, false, false],
-   cathode: ['LiFePO4', 'Aluminium foil', 'Carbon black', 'PVDF binder'], cathodePct: [88, 6, 4, 2], cathodeRen: [false, false, false, false],
-   electrolyte: ['LiPF6', 'Ethylene carbonate', 'Dimethyl carbonate'], electrolytePct: [12, 44, 44], electrolyteRen: [false, false, false]}
-] AS d
-MATCH (c:Company {name: d.company}), (o:EconomicOperator {name: d.operator})
-MERGE (t:Type {name: d.type})
-MERGE (c)-[:HAS_TYPE]->(t)
-MERGE (m:Model {modelId: d.modelId}) SET m.name = d.name
-MERGE (t)-[:HAS_MODEL]->(m)
+MATCH (:Role)-[c:CAN_READ|CAN_EDIT]->(:AttributeDef) DELETE c;
 
-MERGE (sp:StaticPerformance {modelId: d.modelId})
-SET sp.minimalVoltage = d.minV, sp.nominalVoltage = d.nomV, sp.maximalVoltage = d.maxV, sp.voltageUnit = 'V',
-    sp.maxInternalResistance = d.maxIR, sp.internalResistanceUnit = 'mOhm'          // ★ seuil constructeur par module
-MERGE (m)-[:HAS_STATIC_PERFORMANCE]->(sp)
+UNWIND [{num: 1, category: "Identifiers and product data", nameFr: "Identifiant du passeport", nameEn: "Battery passport identifier", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Batterie individuelle", retained: true, justification: "Retrouver le passeport ; affiché par tous les rôles", node: "BatteryInstance", props: ["batteryPassportId"], readers: ["public", "garagiste", "owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 2, category: "Identifiers and product data", nameFr: "Identifiant de la batterie", nameEn: "Battery identifier", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Batterie individuelle", retained: true, justification: "Savoir de quelle batterie on parle", node: "BatteryInstance", props: ["batteryId", "serialNumber"], readers: ["public", "garagiste", "owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 3, category: "Identifiers and product data", nameFr: "Identifiant et infos de l'opérateur", nameEn: "Operator identifier and information", mandatoryEV: "o", unit: "", access: "Public", behaviour: "Statique", level: "Batterie individuelle", retained: true, justification: "Le propriétaire vérifie que la batterie relève bien de lui", node: "EconomicOperator", props: ["operatorId", "name", "address", "country", "email", "phone", "weblink"], readers: ["owner"], editors: []}, {num: 4, category: "Identifiers and product data", nameFr: "Identifiant et infos du fabricant", nameEn: "Manufacturer identifier and information", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Contexte constructeur ; public", node: "Company", props: ["manufacturerId", "name"], readers: ["public", "garagiste", "owner"], editors: []}, {num: 5, category: "Identifiers and product data", nameFr: "Lieu de fabrication", nameEn: "Manufacturing place", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Info publique de provenance", node: "Model", props: ["manufacturingPlace"], readers: ["public"], editors: []}, {num: 6, category: "Identifiers and product data", nameFr: "Date de fabrication", nameEn: "Manufacturing date", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Batterie individuelle", retained: true, justification: "Âge de la batterie : diagnostic et critère de vie restante (défi 3)", node: "BatteryInstance", props: ["manufacturingDate"], readers: ["public", "garagiste", "recycler"], recyclerUsage: "decision", editors: []}, {num: 7, category: "Identifiers and product data", nameFr: "Date de mise en service", nameEn: "Date of putting the battery into service", mandatoryEV: "", unit: "", access: "Intérêt légitime", behaviour: "Statique", level: "Batterie individuelle", retained: true, justification: "Point de départ de la garantie", node: "BatteryInstance", props: ["dateOfPuttingIntoService"], readers: ["owner"], editors: []}, {num: 8, category: "Identifiers and product data", nameFr: "Période de garantie", nameEn: "Warranty period of the battery", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Sous garantie ou non : qui prend en charge le remplacement", node: "DynamicDurability", props: ["warranty"], readers: ["garagiste", "owner"], editors: []}, {num: 9, category: "Identifiers and product data", nameFr: "Catégorie de batterie", nameEn: "Battery category", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Organisation du transport et de la manutention", node: "Type", props: ["name"], readers: ["public", "owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 10, category: "Identifiers and product data", nameFr: "Masse de la batterie", nameEn: "Battery mass", mandatoryEV: "x", unit: "kg", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Manutention et transport (batterie de plusieurs centaines de kg)", node: "Model", props: ["batteryMass"], readers: ["public", "owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 11, category: "Identifiers and product data", nameFr: "Statut de la batterie", nameEn: "Battery status", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Cœur du parcours : lecture pour garagiste et centre de tri (doit être « Waste »), modifiable par le seul propriétaire. NON public", node: "BatteryInstance", props: ["status"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "reception", editors: ["owner"]}, {num: 12, category: "Symbols, labels and documentation of conformity", nameFr: "Symbole de collecte séparée", nameEn: "Separate collection symbol", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Info publique de tri pour le grand public", node: "Certification", props: ["separateCollectionSymbol"], readers: ["public"], editors: []}, {num: 13, category: "Symbols, labels and documentation of conformity", nameFr: "Symboles cadmium et plomb", nameEn: "Symbols for cadmium and lead", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Concerne les batteries plomb/cadmium, pas nos batteries Li-ion", props: [], readers: [], editors: []}, {num: 14, category: "Symbols, labels and documentation of conformity", nameFr: "Label empreinte carbone", nameEn: "Carbon footprint label", mandatoryEV: "o", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Facultatif ; la classe carbone (#24) suffit", props: [], readers: [], editors: []}, {num: 15, category: "Symbols, labels and documentation of conformity", nameFr: "Agent d'extinction", nameEn: "Extinguishing agent", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Batterie individuelle", retained: true, justification: "Sécurité lors de la manipulation d'une batterie défectueuse", node: "Circularity", props: ["extinguishAgent"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 16, category: "Symbols, labels and documentation of conformity", nameFr: "Signification des labels et symboles", nameEn: "Meaning of labels and symbols", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Explicatif, sans utilité pour agir", props: [], readers: [], editors: []}, {num: 17, category: "Symbols, labels and documentation of conformity", nameFr: "Déclaration UE de conformité", nameEn: "EU declaration of conformity", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Conformité réglementaire, vue côté constructeur", node: "Certification", props: ["EUDeclarationOfConformityId", "EUDeclarationOfConformity"], readers: ["owner"], editors: []}, {num: 18, category: "Symbols, labels and documentation of conformity", nameFr: "Rapports de tests de conformité", nameEn: "Results of test reports proving compliance", mandatoryEV: "x", unit: "", access: "Organismes notifiés / autorités", behaviour: "Statique", level: "Modèle", retained: false, justification: "Réservé aux organismes notifiés et autorités", props: [], readers: [], editors: []}, {num: 19, category: "Battery carbon footprint", nameFr: "Empreinte carbone par unité fonctionnelle", nameEn: "Battery carbon footprint per Functional Unit", mandatoryEV: "x", unit: "kgCO2e/kWh", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : impact environnemental", node: "CarbonFootprint", props: ["carbonFootprintDeclared"], readers: ["public"], editors: []}, {num: 20, category: "Battery carbon footprint", nameFr: "Part carbone : matières premières", nameEn: "Contribution of raw material acquisition and pre-processing lifecycle stage", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Détail carbone par étape : niveau modèle, aucune action dans le parcours", props: [], readers: [], editors: []}, {num: 21, category: "Battery carbon footprint", nameFr: "Part carbone : production", nameEn: "Contribution of main product production/manufacturing lifecycle stage", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Détail carbone par étape : niveau modèle, aucune action dans le parcours", props: [], readers: [], editors: []}, {num: 22, category: "Battery carbon footprint", nameFr: "Part carbone : distribution", nameEn: "Contribution of distribution lifecycle stage", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Détail carbone par étape : niveau modèle, aucune action dans le parcours", props: [], readers: [], editors: []}, {num: 23, category: "Battery carbon footprint", nameFr: "Part carbone : fin de vie et recyclage", nameEn: "Contribution of end of life and recycling lifecycle stage", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Détail carbone par étape : niveau modèle, aucune action dans le parcours", props: [], readers: [], editors: []}, {num: 24, category: "Battery carbon footprint", nameFr: "Classe de performance carbone", nameEn: "Carbon footprint performance class", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : classe carbone lisible", node: "CarbonFootprint", props: ["performanceClass"], readers: ["public"], editors: []}, {num: 25, category: "Battery carbon footprint", nameFr: "Lien vers l'étude carbone publique", nameEn: "Web link to public carbon footprint study", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Lien documentaire, non nécessaire à la démo", props: [], readers: [], editors: []}, {num: 26, category: "Battery carbon footprint", nameFr: "Infos générales batterie et fabricant (carbone)", nameEn: "General battery and manufacturer information", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Redondant avec l'identification", props: [], readers: [], editors: []}, {num: 27, category: "Battery carbon footprint", nameFr: "Empreinte carbone absolue", nameEn: "Absolute battery carbon footprint", mandatoryEV: "o", unit: "[tCO2e]", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Facultatif ; #19 suffit", props: [], readers: [], editors: []}, {num: 28, category: "Supply chain due diligence", nameFr: "Rapport de devoir de vigilance", nameEn: "Information of due diligence report", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Devoir de vigilance : hors parcours de réparation / recyclage", props: [], readers: [], editors: []}, {num: 29, category: "Supply chain due diligence", nameFr: "Certifications tierces reconnues", nameEn: "Third party assurances of recognised schemes", mandatoryEV: "o", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Devoir de vigilance : hors parcours", props: [], readers: [], editors: []}, {num: 30, category: "Supply chain due diligence", nameFr: "Indices de chaîne d'approvisionnement", nameEn: "Supply chain indices", mandatoryEV: "o", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Devoir de vigilance : hors parcours", props: [], readers: [], editors: []}, {num: 31, category: "Battery materials and composition", nameFr: "Chimie de la batterie", nameEn: "Battery chemistry", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique ; défi 3 : valeur des matériaux au recyclage", node: "Composition", props: ["batteryChemistry"], readers: ["public", "recycler"], recyclerUsage: "decision", editors: []}, {num: 32, category: "Battery materials and composition", nameFr: "Matières premières critiques", nameEn: "Critical raw materials", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique ; défi 3 : intérêt du recyclage (Co, Ni, Li…)", node: "Composition", props: ["criticalRawMaterials"], readers: ["public", "recycler"], recyclerUsage: "decision", editors: []}, {num: 33, category: "Battery materials and composition", nameFr: "Matériaux cathode, anode, électrolyte", nameEn: "Materials used in cathode, anode and electrolyte", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 3 : filière de recyclage adaptée", node: "Composition", props: ["cathode", "anode", "electrolyte"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 34, category: "Battery materials and composition", nameFr: "Substances dangereuses", nameEn: "Hazardous substances", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Transport de matières dangereuses et stockage au centre de tri", node: "Composition", props: ["hazardousSubstances"], readers: ["owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 35, category: "Battery materials and composition", nameFr: "Impact des substances (environnement, santé)", nameEn: "Impact of substances on environment, human health, safety, persons", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Détail réglementaire ; #34 suffit pour la sécurité", props: [], readers: [], editors: []}, {num: 36, category: "Circularity and resource efficiency", nameFr: "Manuels de démontage", nameEn: "Dismantling information: Manuals for the removal and the disassembly of the battery pack", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 3 : faisabilité d'un démontage / reconditionnement", node: "Circularity", props: ["dismantlingInformation"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 37, category: "Circularity and resource efficiency", nameFr: "Références des composants", nameEn: "Part numbers for components", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 3 : remplacement de modules (Remanufacture)", node: "Circularity", props: ["partNumbers"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 38, category: "Circularity and resource efficiency", nameFr: "Sources des pièces détachées", nameEn: "Information on sources of spare parts", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 3 : disponibilité des pièces pour reconditionner", node: "Circularity", props: ["sparePartsSources"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 39, category: "Circularity and resource efficiency", nameFr: "Mesures de sécurité", nameEn: "Safety measures", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Sécurité de manipulation pour tous les professionnels", node: "Circularity", props: ["safetyMeasures"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "reception", editors: []}, {num: 40, category: "Circularity and resource efficiency", nameFr: "Nickel recyclé pré-consommation", nameEn: "Pre-consumer recycled nickel share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Vue publique simplifiée au contenu post-consommation", props: [], readers: [], editors: []}, {num: 41, category: "Circularity and resource efficiency", nameFr: "Cobalt recyclé pré-consommation", nameEn: "Pre-consumer recycled cobalt share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Vue publique simplifiée au contenu post-consommation", props: [], readers: [], editors: []}, {num: 42, category: "Circularity and resource efficiency", nameFr: "Lithium recyclé pré-consommation", nameEn: "Pre-consumer recycled lithium share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Vue publique simplifiée au contenu post-consommation", props: [], readers: [], editors: []}, {num: 43, category: "Circularity and resource efficiency", nameFr: "Plomb recyclé pré-consommation", nameEn: "Pre-consumer recycled lead share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Vue publique simplifiée au contenu post-consommation", props: [], readers: [], editors: []}, {num: 44, category: "Circularity and resource efficiency", nameFr: "Nickel recyclé post-consommation", nameEn: "Post-consumer recycled nickel share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : contenu recyclé", node: "Circularity", props: ["recycledNickelShare"], readers: ["public"], editors: []}, {num: 45, category: "Circularity and resource efficiency", nameFr: "Cobalt recyclé post-consommation", nameEn: "Post-consumer recycled cobalt share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : contenu recyclé", node: "Circularity", props: ["recycledCobaltShare"], readers: ["public"], editors: []}, {num: 46, category: "Circularity and resource efficiency", nameFr: "Lithium recyclé post-consommation", nameEn: "Post-consumer recycled lithium share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : contenu recyclé", node: "Circularity", props: ["recycledLithiumShare"], readers: ["public"], editors: []}, {num: 47, category: "Circularity and resource efficiency", nameFr: "Plomb recyclé post-consommation", nameEn: "Post-consumer recycled lead share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : contenu recyclé", node: "Circularity", props: ["recycledLeadShare"], readers: ["public"], editors: []}, {num: 48, category: "Circularity and resource efficiency", nameFr: "Part de contenu renouvelable", nameEn: "Renewable content share", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : contenu renouvelable", node: "Circularity", props: ["renewableContentShare"], readers: ["public"], editors: []}, {num: 49, category: "Circularity and resource efficiency", nameFr: "Rôle de l'utilisateur : prévention des déchets", nameEn: "Information on the role of end-users in contributing to waste prevention", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Information grand public, hors parcours", props: [], readers: [], editors: []}, {num: 50, category: "Circularity and resource efficiency", nameFr: "Rôle de l'utilisateur : collecte séparée", nameEn: "Information on the role of end-users in contributing to the separate collection of waste batteries", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Information grand public, hors parcours", props: [], readers: [], editors: []}, {num: 51, category: "Circularity and resource efficiency", nameFr: "Collecte, préparation à la seconde vie, traitement", nameEn: "Information on battery collection, preparation for second life and on treatment at end of life", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Choix de la filière de fin de vie lors du transfert", node: "Circularity", props: ["endOfLifeInformation"], readers: ["owner"], editors: []}, {num: 52, category: "Performance and durability", nameFr: "Capacité nominale", nameEn: "Rated capacity", mandatoryEV: "x", unit: "Ah", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Vue publique : capacité de la batterie", node: "StaticPerformance", props: ["ratedCapacity"], readers: ["public"], editors: []}, {num: 53, category: "Performance and durability", nameFr: "Capacité restante", nameEn: "Remaining capacity", mandatoryEV: "o", unit: "Ah", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Redondant avec le SOCE (#57)", props: [], readers: [], editors: []}, {num: 54, category: "Performance and durability", nameFr: "Perte de capacité", nameEn: "Capacity fade", mandatoryEV: "x", unit: "%", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 3 : dégradation globale", node: "DynamicPerformance", props: ["capacityFade"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 55, category: "Performance and durability", nameFr: "Énergie utilisable certifiée", nameEn: "Certified usable battery energy", mandatoryEV: "o", unit: "kWh", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Valeur de référence modèle ; le SOCE l'intègre déjà", props: [], readers: [], editors: []}, {num: 56, category: "Performance and durability", nameFr: "Énergie utilisable restante", nameEn: "Remaining usable battery energy", mandatoryEV: "o", unit: "kWh", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Redondant avec le SOCE (#57)", props: [], readers: [], editors: []}, {num: 57, category: "Performance and durability", nameFr: "SOCE (état de santé énergétique)", nameEn: "State of certified energy (SOCE)", mandatoryEV: "x", unit: "%", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Indicateur principal de santé : diagnostic, validation de la demande, critère n°1 du défi 3", node: "DynamicPerformance", props: ["soce"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "decision", editors: []}, {num: 58, category: "Performance and durability", nameFr: "SoC (niveau de charge)", nameEn: "State of Charge (SoC)", mandatoryEV: "x", unit: "%", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Contexte de la mesure lors du diagnostic", node: "DynamicPerformance", props: ["soc"], readers: ["garagiste"], editors: []}, {num: 59, category: "Performance and durability", nameFr: "Tension minimale", nameEn: "Minimum voltage", mandatoryEV: "x", unit: "V", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Diagnostic électrique", node: "StaticPerformance", props: ["minimalVoltage"], readers: ["garagiste"], editors: []}, {num: 60, category: "Performance and durability", nameFr: "Tension maximale", nameEn: "Maximum voltage", mandatoryEV: "x", unit: "V", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Diagnostic électrique", node: "StaticPerformance", props: ["maximalVoltage"], readers: ["garagiste"], editors: []}, {num: 61, category: "Performance and durability", nameFr: "Tension nominale", nameEn: "Nominal voltage", mandatoryEV: "x", unit: "V", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Diagnostic électrique", node: "StaticPerformance", props: ["nominalVoltage"], readers: ["garagiste"], editors: []}, {num: 62, category: "Performance and durability", nameFr: "Puissance d'origine", nameEn: "Original power capability", mandatoryEV: "x", unit: "W", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Valeur de référence modèle ; on suit la puissance restante (#63)", props: [], readers: [], editors: []}, {num: 63, category: "Performance and durability", nameFr: "Puissance restante", nameEn: "Remaining power capability", mandatoryEV: "o", unit: "W", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Symptôme de Doc : perte de puissance", node: "DynamicPerformance", props: ["remainingPowerCapability"], readers: ["garagiste"], editors: []}, {num: 64, category: "Performance and durability", nameFr: "Perte de puissance", nameEn: "Power fade", mandatoryEV: "x", unit: "%", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 3 : dégradation de la puissance", node: "DynamicPerformance", props: ["powerFade"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 65, category: "Performance and durability", nameFr: "Puissance maximale autorisée", nameEn: "Maximum permitted battery power", mandatoryEV: "x", unit: "W", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Caractéristique de conception, pas de diagnostic", props: [], readers: [], editors: []}, {num: 66, category: "Performance and durability", nameFr: "Ratio puissance / énergie", nameEn: "Ratio between nominal battery power and battery energy", mandatoryEV: "o", unit: "W/Wh", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Caractéristique de conception, pas de diagnostic", props: [], readers: [], editors: []}, {num: 67, category: "Performance and durability", nameFr: "Rendement initial charge-décharge", nameEn: "Initial round trip energy efficiency", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Rendement : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 68, category: "Performance and durability", nameFr: "Rendement à 50 % de la durée de vie", nameEn: "Round trip energy efficiency at 50% of cycle life", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Rendement : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 69, category: "Performance and durability", nameFr: "Rendement restant", nameEn: "Remaining round trip energy efficiency", mandatoryEV: "", unit: "%", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Rendement : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 70, category: "Performance and durability", nameFr: "Perte de rendement", nameEn: "Energy round trip efficiency fade", mandatoryEV: "x", unit: "%", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: false, justification: "Rendement : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 71, category: "Performance and durability", nameFr: "Autodécharge initiale", nameEn: "Initial self-discharge rate", mandatoryEV: "", unit: "%/month", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: false, justification: "Autodécharge : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 72, category: "Performance and durability", nameFr: "Autodécharge actuelle", nameEn: "Current self-discharge rate", mandatoryEV: "", unit: "%/month", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Autodécharge : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 73, category: "Performance and durability", nameFr: "Évolution de l'autodécharge", nameEn: "Evolution of self-discharge rates", mandatoryEV: "", unit: "%", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Autodécharge : utile en analyse fine, pas pour la démo", props: [], readers: [], editors: []}, {num: 74, category: "Performance and durability", nameFr: "Résistance interne initiale (cellule, pack, module)", nameEn: "Initial internal resistance of battery cell and pack (module recommended)", mandatoryEV: "x", unit: "mΩ", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 1 : référence de résistance initiale par module", node: "StaticPerformance", props: ["initialInternalResistancePack", "initialInternalResistanceModule", "initialInternalResistanceCell"], readers: ["garagiste"], editors: []}, {num: 75, category: "Performance and durability", nameFr: "Augmentation de la résistance interne", nameEn: "Internal resistance increase of pack (cell and module recommended)", mandatoryEV: "x", unit: "%", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: true, justification: "Défi 1 : module défaillant ; preuve pour le propriétaire ; défi 3 : 1-2 modules mauvais → Remanufacture", node: "DynamicPerformance", props: ["internalResistanceIncrease"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "decision", editors: []}, {num: 76, category: "Performance and durability", nameFr: "Durée de vie prévue (années)", nameEn: "Expected lifetime in calendar years", mandatoryEV: "x", unit: "years", access: "Intérêt légitime", behaviour: "Statique", level: "Modèle", retained: false, justification: "Proche de #77 (cycles), qu'on utilise", props: [], readers: [], editors: []}, {num: 77, category: "Performance and durability", nameFr: "Durée de vie prévue (cycles)", nameEn: "Expected lifetime: Number of charge-discharge cycles", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Usure : comparaison cycles prévus / effectués", node: "StaticDurability", props: ["expectedBatteryLifetimeCycles"], readers: ["garagiste", "recycler"], recyclerUsage: "decision", editors: []}, {num: 78, category: "Performance and durability", nameFr: "Nombre de cycles effectués", nameEn: "Number of full charging and discharging cycles", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Usure réelle de la batterie", node: "DynamicDurability", props: ["numberOfFullCycles"], readers: ["garagiste", "recycler"], recyclerUsage: "decision", editors: []}, {num: 79, category: "Performance and durability", nameFr: "Test de référence de durée de vie", nameEn: "Cycle-life reference test", mandatoryEV: "x", unit: "", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Conditions de test : documentaire", props: [], readers: [], editors: []}, {num: 80, category: "Performance and durability", nameFr: "C-rate du test de durée de vie", nameEn: "C-rate of relevant cycle-life test", mandatoryEV: "x", unit: "A/Ah", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Conditions de test : documentaire", props: [], readers: [], editors: []}, {num: 81, category: "Performance and durability", nameFr: "Énergie cumulée échangée", nameEn: "Energy throughput", mandatoryEV: "", unit: "kWh", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Redondant avec le nombre de cycles (#78)", props: [], readers: [], editors: []}, {num: 82, category: "Performance and durability", nameFr: "Capacité cumulée échangée", nameEn: "Capacity throughput", mandatoryEV: "", unit: "Ah", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Redondant avec le nombre de cycles (#78)", props: [], readers: [], editors: []}, {num: 83, category: "Performance and durability", nameFr: "Seuil d'épuisement (capacité)", nameEn: "Capacity threshold for exhaustion", mandatoryEV: "x", unit: "%", access: "Public", behaviour: "Statique", level: "Modèle", retained: true, justification: "Seuil fixé par le constructeur : SOCE au-dessus → encore utilisable en VE ; critère clé du défi 3", node: "StaticDurability", props: ["capacityThresholdForExhaustion"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "decision", editors: []}, {num: 84, category: "Performance and durability", nameFr: "Informations de température", nameEn: "Temperature information", mandatoryEV: "x", unit: "°C", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Diagnostic : surchauffe ?", node: "DynamicDurability", props: ["temperatureInformation"], readers: ["garagiste"], editors: []}, {num: 85, category: "Performance and durability", nameFr: "Plage de température au repos : min", nameEn: "Temperature range idle state, lower boundary", mandatoryEV: "x", unit: "°C", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Spécification de conception ; on suit les dépassements (#87-88)", props: [], readers: [], editors: []}, {num: 86, category: "Performance and durability", nameFr: "Plage de température au repos : max", nameEn: "Temperature range idle state, upper boundary", mandatoryEV: "x", unit: "°C", access: "Public", behaviour: "Statique", level: "Modèle", retained: false, justification: "Spécification de conception ; on suit les dépassements (#87-88)", props: [], readers: [], editors: []}, {num: 87, category: "Performance and durability", nameFr: "Temps au-dessus de la température max", nameEn: "Time spent in extreme temperatures above boundary", mandatoryEV: "", unit: "Minutes", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Défi 3 : vieillissement accéléré caché", node: "DynamicDurability", props: ["timeExtremeTempAbove"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 88, category: "Performance and durability", nameFr: "Temps en dessous de la température min", nameEn: "Time spent in extreme temperatures below boundary", mandatoryEV: "", unit: "Minutes", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Défi 3 : vieillissement accéléré caché", node: "DynamicDurability", props: ["timeExtremeTempBelow"], readers: ["recycler"], recyclerUsage: "decision", editors: []}, {num: 89, category: "Performance and durability", nameFr: "Temps de charge au-dessus de la température max", nameEn: "Time spent charging during extreme temperatures above boundary", mandatoryEV: "", unit: "Minutes", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Détail des dépassements en charge ; #87-88 suffisent", props: [], readers: [], editors: []}, {num: 90, category: "Performance and durability", nameFr: "Temps de charge en dessous de la température min", nameEn: "Time spent charging during extreme temperatures below boundary", mandatoryEV: "", unit: "Minutes", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: false, justification: "Détail des dépassements en charge ; #87-88 suffisent", props: [], readers: [], editors: []}, {num: 91, category: "Performance and durability", nameFr: "Décharges profondes", nameEn: "Number of deep discharge events", mandatoryEV: "o", unit: "", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Incident : règle éliminatoire (sécurité) au défi 3", node: "DynamicDurability", props: ["deepDischargeEvents"], readers: ["garagiste", "recycler"], recyclerUsage: "decision", editors: []}, {num: 92, category: "Performance and durability", nameFr: "Surcharges", nameEn: "Number of overcharge events", mandatoryEV: "o", unit: "", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Incident : règle éliminatoire (sécurité) au défi 3", node: "DynamicDurability", props: ["overchargeEvents"], readers: ["garagiste", "recycler"], recyclerUsage: "decision", editors: []}, {num: 93, category: "Performance and durability", nameFr: "Accidents", nameEn: "Information on accidents", mandatoryEV: "x", unit: "", access: "Intérêt légitime", behaviour: "Dynamique", level: "Batterie individuelle", retained: true, justification: "Incident : garagiste, preuve pour le propriétaire, règle éliminatoire au défi 3", node: "DynamicDurability", props: ["accidents"], readers: ["garagiste", "owner", "recycler"], recyclerUsage: "decision", editors: []}] AS a
+MERGE (d:AttributeDef {num: a.num})
+SET d.category = a.category, d.nameFr = a.nameFr, d.nameEn = a.nameEn, d.mandatoryEV = a.mandatoryEV,
+    d.unit = a.unit, d.access = a.access, d.behaviour = a.behaviour, d.level = a.level,
+    d.retained = a.retained, d.justification = a.justification, d.node = a.node, d.props = a.props
+WITH d, a
+UNWIND a.readers AS rc
+MATCH (r:Role {code: rc})
+MERGE (r)-[c:CAN_READ]->(d)
+SET c.usage = CASE WHEN rc = 'recycler' THEN a.recyclerUsage ELSE null END;
 
-MERGE (sd:StaticDurability {modelId: d.modelId})
-SET sd.expectedBatteryLifetimeCycles = d.cycles, sd.cRateRelevantCycleLifeTest = d.cRate, sd.cRateUnit = 'A/Ah'
-MERGE (m)-[:HAS_STATIC_DURABILITY]->(sd)
+UNWIND [{num: 11, editors: ["owner"]}] AS a
+MATCH (d:AttributeDef {num: a.num}) UNWIND a.editors AS rc MATCH (r:Role {code: rc})
+MERGE (r)-[:CAN_EDIT]->(d);
 
-MERGE (cert:Certification {modelId: d.modelId})
-SET cert.EUDeclarationOfConformityId = 'EU-DoC-' + d.modelId + '-2026',
-    cert.EUDeclarationOfConformity = 'https://docs.example/' + d.modelId + '/eu-declaration-of-conformity.pdf',
-    cert.separateCollectionSymbol = 'Crossed-out wheeled bin (EN IEC 62902)'
-MERGE (m)-[:HAS_CERTIFICATION]->(cert)
+MERGE (dm:DecisionMatrix {matrixId: 'DM-v1'})
+SET dm.version = 1, dm.wMarket = 0.10,
+    dm.note = 'Seuils et pondérations : hypothèses de l’équipe, paramétrables (pas des valeurs réglementaires)'
+WITH dm
+MATCH (dm)-[old:USES_CRITERION]->() DELETE old;
 
-MERGE (circ:Circularity {modelId: d.modelId})
-SET circ.extinguishAgent = d.extinguish,
-    circ.partNumbers = 'https://docs.example/' + d.modelId + '/spare-parts'
-MERGE (m)-[:HAS_CIRCULARITY]->(circ)
-
-MERGE (cf:CarbonFootprint {modelId: d.modelId})
-SET cf.carbonFootprintDeclared = d.cf, cf.unit = 'kg CO2e / kWh', cf.performanceClass = d.cfClass,
-    cf.linkStudy = 'https://docs.example/' + d.modelId + '/carbon-footprint-study.pdf'
-MERGE (m)-[:HAS_CARBON_FOOTPRINT]->(cf)
-MERGE (o)-[:HAS_CARBON_FOOTPRINT]->(cf)
-
-MERGE (comp:Composition {composition_id: d.modelId + '-COMP'}) SET comp.batteryChemistry = d.chemistry
-MERGE (m)-[:HAS_COMPOSITION]->(comp)
-MERGE (an:Anode {anodeId: d.modelId + '-AN'})
-SET an.anodeMaterialsList = d.anode, an.percentageList = d.anodePct, an.isRenewable = d.anodeRen
-MERGE (comp)-[:HAS_ANODE]->(an)
-MERGE (ca:Cathode {cathodeId: d.modelId + '-CA'})
-SET ca.cathodeMaterialsList = d.cathode, ca.percentageList = d.cathodePct, ca.isRenewable = d.cathodeRen
-MERGE (comp)-[:HAS_CATHODE]->(ca)
-MERGE (el:Electrolyte {electrolyteId: d.modelId + '-EL'})
-SET el.electrolyteMaterialsList = d.electrolyte, el.percentageList = d.electrolytePct, el.isRenewable = d.electrolyteRen
-MERGE (comp)-[:HAS_ELECTROLYTE]->(el);
-
-// ---------------------------------------------------------------------
-// 3) Batteries physiques (instances) + données dynamiques
-//    soce = State of Certified Energy (≈ SOH en énergie), soc = State of Charge
-// ---------------------------------------------------------------------
-UNWIND [
-  {id: 'DLR-1985', model: 'FC-88', status: 'Original', soce: 71, soc: 64, warranty: '2033-10-26',
-   made: '2025-10-26', place: 'Hill Valley Gigafactory (FR)', serial: 'FC88-25-001985', weight: 478,
-   owner: 'Dr. Emmett Brown', vehicle: 'DeLorean DMC-12 (VIN fictif 1985HV)'},
-  {id: 'DLR-2015', model: 'FC-88', status: 'Original', soce: 94, soc: 80, warranty: '2034-10-21',
-   made: '2026-02-11', place: 'Hill Valley Gigafactory (FR)', serial: 'FC88-26-002015', weight: 478,
-   owner: 'Marty McFly', vehicle: 'DeLorean DMC-12 (VIN fictif 2015HV)'},
-  {id: 'DLR-1955', model: 'FC-88', status: 'Waste', soce: 38, soc: 0, warranty: '2033-11-05',
-   made: '2025-11-05', place: 'Hill Valley Gigafactory (FR)', serial: 'FC88-25-001955', weight: 478,
-   owner: 'Biff Tannen', vehicle: 'Ford Super De Luxe (VIN fictif 1955HV)'},
-  {id: 'HVB-0001', model: 'HV-LFP-60', status: 'Original', soce: 97, soc: 55, warranty: '2034-03-01',
-   made: '2026-03-01', place: 'Lille (FR)', serial: 'HV60-26-000001', weight: 395,
-   owner: 'Jennifer Parker', vehicle: 'Citadine électrique (VIN fictif)'},
-  {id: 'HVB-0002', model: 'HV-LFP-60', status: 'Repurposed', soce: 76, soc: 90, warranty: '2033-06-15',
-   made: '2025-06-15', place: 'Lille (FR)', serial: 'HV60-25-000002', weight: 395,
-   owner: 'Station de recharge A6 (stockage stationnaire)', vehicle: '—'},
-  {id: 'MF-0042', model: 'MF-48', status: 'Reused', soce: 82, soc: 70, warranty: '2028-04-20',
-   made: '2026-04-20', place: 'Stuttgart (DE)', serial: 'MF48-26-000042', weight: 4.1,
-   owner: 'Loueur de VTT Hill Valley', vehicle: 'VTT électrique'},
-  {id: 'CTS-1885', model: 'CT-200', status: 'Original', soce: 90, soc: 48, warranty: '2036-01-01',
-   made: '2026-01-01', place: 'Lille (FR)', serial: 'CT200-26-001885', weight: 1650,
-   owner: 'Mairie de Hill Valley (stockage solaire)', vehicle: '—'}
-] AS d
-MATCH (m:Model {modelId: d.model})<-[:HAS_MODEL]-(:Type)<-[:HAS_TYPE]-(:Company)-[:HAS_ECONOMIC_OPERATOR]->(o:EconomicOperator)
-MERGE (b:BatteryInstance {batteryId: d.id})
-  ON CREATE SET b.status = d.status
-SET b.batteryPassportId = 'BP-' + d.id,
-    b.serialNumber = d.serial, b.manufacturingDate = d.made, b.manufacturingPlace = d.place,   // ★
-    b.weightKg = d.weight, b.currentHolder = d.owner, b.installedIn = d.vehicle               // ★
-MERGE (m)-[:HAS_BATTERY_INSTANCE]->(b)
-MERGE (o)-[:BUILD]->(b)
-MERGE (dd:DynamicDurability {batteryId: d.id})
-SET dd.warranty = d.warranty, dd.accidents = 'Aucun accident déclaré'
-MERGE (b)-[:HAS_DYNAMIC_DURABILITY]->(dd)
-MERGE (dp:DynamicPerformance {batteryId: d.id})
-  ON CREATE SET dp.soce = d.soce, dp.soc = d.soc, dp.unit = '%'
-MERGE (b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp)
-MERGE (b)-[:HAS_EVENT]->(e:Event {eventId: d.id + '-MANUFACTURED'})
-  ON CREATE SET e.type = 'MANUFACTURED', e.ts = d.made + 'T08:00:00Z', e.role = 'manufacturer',
-                e.by = o.name, e.details = 'Fabrication – ' + d.place + ' – S/N ' + d.serial;
-
-// ---------------------------------------------------------------------
-// 4) ★ EXTENSION Défi 1 : 5 modules par batterie
-// ---------------------------------------------------------------------
-MATCH (b:BatteryInstance)
-UNWIND range(1, 5) AS i
-MERGE (mod:Module {moduleId: b.batteryId + '-M' + toString(i)})
-  ON CREATE SET mod.position = i, mod.health = 'OK', mod.consecutiveOver = 0
-MERGE (b)-[:HAS_MODULE]->(mod);
+MATCH (dm:DecisionMatrix {matrixId: 'DM-v1'})
+UNWIND [{num: 91, ruleType: "Éliminatoire", weight: 0.0, rule: "> 5 décharges profondes → Recycle"}, {num: 92, ruleType: "Éliminatoire", weight: 0.0, rule: "> 3 surcharges → Recycle"}, {num: 93, ruleType: "Éliminatoire", weight: 0.0, rule: "accident déclaré → Recycle"}, {num: 57, ruleType: "Score", weight: 0.25, rule: "SOCE en %"}, {num: 83, ruleType: "Score", weight: 0.1, rule: "SOCE ≥ seuil → Reuse possible ; sinon Repurpose ou Recycle"}, {num: 75, ruleType: "Score", weight: 0.2, rule: "1 ou 2 modules hors seuil → Remanufacture"}, {num: 54, ruleType: "Score", weight: 0.1, rule: "perte de capacité"}, {num: 64, ruleType: "Score", weight: 0.1, rule: "perte de puissance (pénalise Reuse)"}, {num: 6, ruleType: "Score", weight: 0.05, rule: "âge"}, {num: 77, ruleType: "Score", weight: 0.0, rule: "référence pour le ratio cycles effectués / prévus"}, {num: 78, ruleType: "Score", weight: 0.1, rule: "ratio cycles effectués / prévus"}, {num: 87, ruleType: "Score", weight: 0.05, rule: "temps au-dessus de la température max"}, {num: 88, ruleType: "Score", weight: 0.05, rule: "temps en dessous de la température min"}, {num: 31, ruleType: "Contexte", weight: 0.0, rule: "NMC → valeur Ni/Co au recyclage ; LFP → stockage stationnaire"}, {num: 32, ruleType: "Contexte", weight: 0.0, rule: "valeur du recyclage"}, {num: 33, ruleType: "Contexte", weight: 0.0, rule: "choix de la filière de recyclage"}, {num: 36, ruleType: "Faisabilité", weight: 0.0, rule: "manuel de démontage requis pour Remanufacture"}, {num: 37, ruleType: "Faisabilité", weight: 0.0, rule: "références des modules de remplacement"}, {num: 38, ruleType: "Faisabilité", weight: 0.0, rule: "disponibilité des pièces"}] AS c
+MATCH (d:AttributeDef {num: c.num})
+MERGE (dm)-[u:USES_CRITERION]->(d)
+SET u.ruleType = c.ruleType, u.weight = c.weight, u.rule = c.rule;
