@@ -9,7 +9,7 @@ from datetime import datetime
 
 from neo4j import GraphDatabase
 
-from . import config, seed_data
+from . import config, seed_data, telemetry
 
 
 def now():
@@ -82,11 +82,75 @@ class Neo4jRepo:
     # --- initialisation -------------------------------------------------------
     def reset(self):
         """Efface les nœuds de démo puis recharge le jeu de données."""
-        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event OR n:Decision DETACH DELETE n")
+        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event OR n:Decision OR n:Measurement OR n:Alert DETACH DELETE n")
         uids = [uid for _, uid, _ in seed_data.NODES]
         self._write("MATCH (n) WHERE n.uid IN $uids DETACH DELETE n", uids=uids)
         for stmt in seed_data.cypher_statements():
             self._write(stmt)
+
+    # --- défi 1 : télémétrie BMS ------------------------------------------------
+    def record_telemetry(self, battery_id, readings, ts=None, source="BMS"):
+        ts = ts or now()
+        mods = {r["m"]["index"]: r["m"] for r in self._read(
+            "MATCH (:BatteryInstance {batteryId: $id})-[:HAS_MODULE]->(m:Module) "
+            "RETURN m{.*, index: coalesce(m.index, m.position)} AS m", id=battery_id)}
+        if not mods:
+            raise telemetry.TelemetryError(f"Batterie {battery_id} inconnue.")
+        raised = []
+        for rd in readings:
+            m = mods.get(rd["index"])
+            if m is None:
+                continue
+            rmax = m.get("maxInternalResistance_mOhm") or 2.0
+            was = m.get("health")
+            health, over = telemetry.next_health(rd["r"], rmax, m.get("consecutiveOver") or 0)
+            msg = telemetry.alert_message(rd["index"], rd["r"], rmax) \
+                if health == "CRITICAL" and was != "CRITICAL" else None
+            self._write("""
+                MATCH (b:BatteryInstance {batteryId: $bid})-[:HAS_MODULE]->(m:Module {uid: $muid})
+                SET m.internalResistance_mOhm = $r, m.measuredAt = $ts, m.health = $health,
+                    m.consecutiveOver = $over, m.lastVoltage = $v, m.lastCurrent = $i,
+                    m.lastTemperature = $t, m.source = $src, b.lastTelemetryAt = $ts
+                CREATE (m)-[:HAS_MEASUREMENT]->(:Measurement {ts: $ts, internalResistance_mOhm: $r,
+                        voltage: $v, current: $i, temperature: $t})
+                WITH b, m
+                FOREACH (_ IN CASE WHEN $msg IS NULL THEN [] ELSE [1] END |
+                  CREATE (m)-[:RAISED]->(:Alert {uid: $auid, level: 'CRITICAL', at: $ts, open: true,
+                          module: m.index, value: $r, threshold: $rmax, message: $msg})
+                  CREATE (b)-[:HAS_EVENT]->(:Event {uid: $euid, type: 'BMS_ALERT', at: $ts,
+                          actorName: 'BMS (' + $src + ')', details: $msg}))
+                """, bid=battery_id, muid=m["uid"], r=rd["r"], ts=ts, health=health, over=over,
+                v=rd["v"], i=rd["i"], t=rd["t"], src=source, msg=msg, rmax=rmax,
+                auid=new_uid("ALERT"), euid=new_uid("EVT"))
+            if msg:
+                raised.append(msg)
+        return raised
+
+    def get_telemetry(self, battery_id, limit=60):
+        rows = self._read("""
+            MATCH (b:BatteryInstance {batteryId: $id})-[:HAS_MODULE]->(m:Module)
+            OPTIONAL MATCH (m)-[:HAS_MEASUREMENT]->(x:Measurement)
+            WITH b, m, x ORDER BY x.ts DESC
+            WITH b, m, collect(x{ts: x.ts, r: x.internalResistance_mOhm, v: x.voltage,
+                                 i: x.current, t: x.temperature})[..$limit] AS xs
+            OPTIONAL MATCH (m)-[:RAISED]->(a:Alert)
+            RETURN b.lastTelemetryAt AS last, coalesce(m.index, m.position) AS index,
+                   m{.*} AS m, reverse(xs) AS points, collect(a{.*}) AS alerts
+            ORDER BY index""", id=battery_id, limit=limit)
+        if not rows:
+            return None
+        mods, alerts = [], []
+        for row in rows:
+            m = row["m"]
+            r = m.get("internalResistance_mOhm", m.get("lastResistance"))
+            rmax = m.get("maxInternalResistance_mOhm")
+            mods.append(dict(index=row["index"], r=r, rmax=rmax,
+                             health=m.get("health") or telemetry.health_from_value(r, rmax),
+                             t=m.get("lastTemperature"), v=m.get("lastVoltage"),
+                             at=m.get("measuredAt"), points=row["points"]))
+            alerts += row["alerts"]
+        return dict(batteryId=battery_id, lastTelemetryAt=rows[0]["last"], modules=mods,
+                    alerts=sorted(alerts, key=lambda a: a.get("at", ""), reverse=True))
 
     # --- lectures ----------------------------------------------------------------
     def list_batteries(self):
@@ -118,6 +182,8 @@ class Neo4jRepo:
                 mod["internalResistance_mOhm"] = mod["lastResistance"]
             elif "internalResistance_mOhm" not in mod and "initialInternalResistance" in mod:
                 mod["internalResistance_mOhm"] = mod["initialInternalResistance"]
+            mod.setdefault("health", telemetry.health_from_value(
+                mod.get("internalResistance_mOhm"), mod.get("maxInternalResistance_mOhm")))
         p["modules"] = raw_modules
         pending = self._read(
             "MATCH (n:Notification {state: 'PENDING'})-[:ABOUT]->(:BatteryInstance {batteryId: $id}) "

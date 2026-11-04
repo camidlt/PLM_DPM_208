@@ -124,7 +124,7 @@ def _feasibility(x, params):
     if soce is None or soce < thr:
         excl["Reuse"].append(f"SOCE {soce} % sous le seuil d'épuisement constructeur ({thr} %)")
     if n_bad:
-        excl["Reuse"].append(f"{n_bad} module(s) hors tolérance")
+        excl["Reuse"].append(f"{n_bad} module{'s' if n_bad > 1 else ''} hors tolérance")
     # Remanufacture : 1 à N modules à remplacer, le reste proche du seuil, démontage documenté
     if n_bad == 0:
         excl["Remanufacture"].append("Aucun module à remplacer")
@@ -214,29 +214,29 @@ def recommend(passport, demands, weights=None, params=None, today=None):
 
     just = []
     if safety:
-        just.append("⛔ Règle de sécurité : " + ", ".join(safety) + " → seul le recyclage est autorisé.")
+        just.append("Règle de sécurité : " + ", ".join(safety) + " → seul le recyclage est autorisé.")
     just.append(f"SOCE {x['soce']} % pour un seuil d'épuisement constructeur de {x['threshold']} % "
                 + ("(encore apte à un usage VE)." if (x["soce"] or 0) >= x["threshold"] else "(plus apte à un usage VE)."))
     if x["bad_modules"]:
         details = ", ".join(f"module {m['index']} : {m['r']} mΩ (+{m['increase_pct']} %)"
                             for m in x["modules"] if m["bad"])
-        just.append(f"{len(x['bad_modules'])} module(s) hors tolérance : {details}.")
+        just.append(f"{len(x['bad_modules'])} module{'s' if len(x['bad_modules']) > 1 else ''} hors tolérance : {details}.")
     else:
         just.append("Tous les modules sont dans les tolérances constructeur.")
     just.append(f"Usure {round(indices['usure'] * 100)} % ({x['cycles']}/{x['expected_cycles']} cycles, "
                 f"{x['age_years']} ans) · stress {round(indices['stress'] * 100)} % · chimie {x['chemistry']}.")
     for o in options:
         if not o["feasible"] and not safety:
-            just.append(f"{o['option']} exclu : " + " ; ".join(o["excluded_because"]) + ".")
+            just.append(f"{o['option']} exclue : " + " ; ".join(o["excluded_because"]) + ".")
     if best["demands"]:
-        just.append(f"Demande(s) du marché pour {best['option']} : "
+        just.append(f"Demande{'s' if len(best['demands']) > 1 else ''} du marché pour {best['option']} : "
                     + ", ".join(f"{d['title']} ({d['urgency']})" for d in best["demands"]) + ".")
     if not params["use_market"]:
         just.append("Priorité du centre : demandes du marché ignorées, chaque batterie va vers son usage idéal.")
     if not params["use_hierarchy"]:
         just.append("Priorité du centre : pas de préférence pour le réemploi avant le recyclage.")
     if tech_best["option"] != best["option"]:
-        just.append(f"⚖️ Techniquement, {tech_best['option']} était préférable : la demande du marché "
+        just.append(f"Techniquement, {tech_best['option']} était préférable : la demande du marché "
                     f"fait basculer la recommandation vers {best['option']}.")
     if len(ranked) > 1:
         just.append(f"Écart avec l'option suivante ({ranked[1]['option']}) : "
@@ -252,20 +252,20 @@ def recommend(passport, demands, weights=None, params=None, today=None):
     }[best["option"]]
     highlights = []
     if safety:
-        highlights.append("⛔ Sécurité : " + ", ".join(safety))
+        highlights.append(dict(icon="ban", text="Sécurité : " + ", ".join(safety)))
     else:
         soce, thr = x["soce"], x["threshold"]
-        highlights.append(f"🔋 SOCE {soce} % {'≥' if (soce or 0) >= thr else '<'} seuil VE {thr} %")
+        highlights.append(dict(icon="battery", text=f"SOCE {soce} % {'≥' if (soce or 0) >= thr else '<'} seuil VE {thr} %"))
         if x["bad_modules"]:
             worst = max((m for m in x["modules"] if m["bad"]), key=lambda m: m["increase_pct"] or 0)
-            highlights.append(f"🔧 Module{'s' if len(x['bad_modules']) > 1 else ''} {bad} hors tolérance "
-                              f"(jusqu'à +{worst['increase_pct']} % de résistance)")
+            highlights.append(dict(icon="wrench", text=f"Module{'s' if len(x['bad_modules']) > 1 else ''} {bad} hors tolérance "
+                              f"(jusqu'à +{worst['increase_pct']} % de résistance)"))
         else:
-            highlights.append("🔧 Modules homogènes, dans les tolérances")
+            highlights.append(dict(icon="wrench", text="Modules homogènes, dans les tolérances"))
     if best["demands"] and best["market"] > 0:
-        highlights.append(f"🛒 {best['demands'][0]['title']} ({best['demands'][0]['urgency']})")
+        highlights.append(dict(icon="shopping-cart", text=f"{best['demands'][0]['title']} ({best['demands'][0]['urgency']})"))
     elif not safety:
-        highlights.append(f"⏳ Usure {round(indices['usure'] * 100)} % · {x['chemistry']}")
+        highlights.append(dict(icon="clock", text=f"Usure {round(indices['usure'] * 100)} % · {x['chemistry']}"))
     gap = round(best["score"] - ranked[1]["score"], 1) if len(ranked) > 1 else None
 
     return dict(recommendation=best["option"], options=options, inputs=x, indices=indices,

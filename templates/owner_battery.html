@@ -2,24 +2,27 @@
 {% import "_macros.html" as ui with context %}
 {% block title %}{{ p.battery.batteryId }} · Propriétaire{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('owner_home') }}">← Tableau de bord</a></p>
+<p style="margin-bottom:16px"><a href="{{ url_for('owner_home') }}">{{ icon('arrow-left') }} Flotte et demandes</a></p>
 {{ ui.passport_header(p) }}
 {% if p.pending_request %}{% set n = p.pending_request %}
-<div class="card" style="border-color:var(--accent)">
-  <h2>🔔 Demande de {{ n.senderName }}</h2>
-  <p style="margin:.25rem 0">{{ ui.status_badge(n.fromStatus) }} → {{ ui.status_badge(n.requestedStatus) }}
-    · {{ n.createdAt|replace('T', ' ') }}</p>
-  <p><strong>Motif :</strong> {{ n.reason }}<br><span class="small muted">Diagnostic : {{ n.diagnostic }}</span></p>
+<section class="request" style="margin-top:20px">
+  <div class="row between">
+    <h2 style="display:flex; gap:10px; align-items:center">{{ icon('bell') }} Demande de {{ n.senderName }}</h2>
+    <div class="row">{{ ui.status_badge(n.fromStatus) }} {{ icon('move-right') }} {{ ui.status_badge(n.requestedStatus) }} <span class="small mute">{{ n.createdAt|ts }}</span></div>
+  </div>
+  <p class="reason"><strong>Motif :</strong> {{ n.reason }}</p>
+  <p class="small mute">Diagnostic : {{ n.diagnostic }}</p>
   {% include "_decision_form.html" %}
-</div>
+</section>
 {% endif %}
-<div class="grid two" style="margin-top:16px">
+<div class="grid two" style="margin-top:20px">
   <div>
-    {{ ui.identification(p) }}
+    {{ ui.live_bay(p, live) }}
     {{ ui.performance(p) }}
-    {{ ui.modules(p) }}
+    {{ ui.identification(p) }}
     {{ ui.safety_card(p) }}
   </div>
   <div>{{ ui.transfer_card(p) }}{{ ui.composition(p) }}{{ ui.sustainability(p) }}{{ ui.history_card(history) }}</div>
 </div>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='live.js') }}" defer></script>{% endblock %}

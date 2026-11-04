@@ -3,67 +3,62 @@
 {% block title %}{{ p.battery.batteryId }} · Centre de tri{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('tri_home') }}">← Scanner une autre batterie</a></p>
+<p style="margin-bottom:16px"><a href="{{ url_for('tri_home') }}">{{ icon('arrow-left') }} Scanner une autre batterie</a></p>
 {{ ui.passport_header(p) }}
 
 {% set t = p.transfer %}
+<div style="margin-top:20px">
 {% if p.battery.status == 'Waste' %}
-  <div class="status-check ok card compact">
-    <div>Statut du Battery Passport</div>
-    <div class="big">✅ WASTE</div>
-    <div>Le statut est à jour : la batterie peut être prise en charge.</div>
+  <div class="check ok" role="status">{{ icon('circle-check') }}
+    <div class="big">WASTE</div>
+    <div>Statut à jour : la batterie peut être prise en charge.</div>
   </div>
 {% else %}
-  <div class="status-check bad card compact">
-    <div>Statut du Battery Passport</div>
-    <div class="big">⛔ {{ p.battery.status|upper }}</div>
-    <div>Statut NON à jour : ne pas prendre en charge, contacter le propriétaire.</div>
+  <div class="check bad" role="alert">{{ icon('ban') }}
+    <div class="big">{{ p.battery.status|upper }}</div>
+    <div>Statut NON à jour : ne pas prendre en charge, contacter le propriétaire du passeport.</div>
   </div>
 {% endif %}
-
-<div class="card reception">
-  <h2>Réception</h2>
-  {% if t and t.state == 'RECEIVED' %}
-    <div class="alert ok"><span class="icon">📦</span><div><strong>Réceptionnée</strong>
-      par {{ t.toName }} le {{ t.receivedAt|replace('T', ' ') }} (ordre {{ t.uid }})</div></div>
-  {% elif t and t.state == 'ORDERED' and t.toUid == user.actor_uid and p.battery.status == 'Waste' %}
-    <p class="small">Ordre de transfert <strong>{{ t.uid }}</strong> depuis {{ t.fromName or '—' }}.</p>
-    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}">
-      <button class="btn accent block" type="submit">📦 Confirmer la réception</button>
-    </form>
-  {% elif t and t.state == 'ORDERED' %}
-    <div class="alert warn"><span class="icon">↪️</span><div>Cette batterie est attendue par
-      <strong>{{ t.toName }}</strong>, pas par votre centre.</div></div>
-  {% else %}
-    <div class="alert warn"><span class="icon">❓</span><div>Aucun ordre de transfert pour cette batterie.</div></div>
-  {% endif %}
 </div>
 
-{# Défi 3 : aide à la décision (au centre de l'écran) #}
+<section class="panel" style="margin-top:20px">
+  <h2>{{ icon('package-check') }} Réception</h2>
+  {% if t and t.state == 'RECEIVED' %}
+    <div class="note ok">{{ icon('package-check') }}<div><strong>Réceptionnée</strong>par {{ t.toName }} le {{ t.receivedAt|ts }} (ordre {{ t.uid }})</div></div>
+  {% elif t and t.state == 'ORDERED' and t.toUid == user.actor_uid and p.battery.status == 'Waste' %}
+    <p class="small soft">Ordre de transfert <strong>{{ t.uid }}</strong> depuis {{ t.fromName or 'origine non renseignée' }}.</p>
+    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}" style="margin-top:14px">
+      <button class="btn primary block big" type="submit">{{ icon('package-check') }} Confirmer la réception</button>
+    </form>
+  {% elif t and t.state == 'ORDERED' %}
+    <div class="note warn">{{ icon('repeat-2') }}<div><strong>Mauvais destinataire</strong>Cette batterie est attendue par {{ t.toName }}, pas par votre centre.</div></div>
+  {% else %}
+    <div class="note warn">{{ icon('circle-help') }}<div><strong>Aucun ordre de transfert</strong>Le propriétaire n'a pas encore organisé le transfert de cette batterie.</div></div>
+  {% endif %}
+</section>
+
 {% include "_decision_panel.html" %}
 
-{# Fiche technique complète repliée sous le panneau pour un usage terrain rapide #}
-<details class="fiche card" style="margin-top:14px">
-  <summary style="font-weight:700; cursor:pointer; padding:6px 0">📋 Fiche technique complète & contrôles</summary>
-  <div style="margin-top:12px">
-    <div class="card" style="margin-bottom:12px">
-      <h2>Contrôle Réception Tronc Commun (#1, #2, #11)</h2>
+<details class="panel" style="margin-top:20px">
+  <summary>{{ icon('file-text') }} Fiche technique complète et contrôles {{ icon('chevron-down', 'chev') }}</summary>
+  <div style="margin-top:16px" class="stack">
+    <section class="panel">
+      <h2>{{ icon('shield-check') }} Contrôle à réception</h2>
       <dl class="kv">
-        <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'EV Traction' }}</dd>
-        <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (engins requis)</dd>
-        <dt>Substances dangereuses (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · Classe 9</span></dd>
-        <dt>Agent d'extinction stockage (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
-        <dt>Consignes sécurité (#39)</dt><dd>Zone de quarantaine ventilée ignifugée à distance des cellules saines</dd>
+        <dt>Catégorie <span class="attr">#9</span></dt><dd>{{ p.type.name if p.type else 'Traction VE' }}</dd>
+        <dt>Masse <span class="attr">#10</span></dt><dd>{{ p.battery.weightKg or 450 }} kg, engins de levage requis</dd>
+        <dt>Substances dangereuses <span class="attr">#34</span></dt><dd>Matière dangereuse ADR, classe 9</dd>
+        <dt>Agent d'extinction <span class="attr">#15</span></dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau, refroidissement massif' }}</dd>
+        <dt>Stockage <span class="attr">#39</span></dt><dd>Zone de quarantaine ventilée et ignifugée, à distance des cellules saines</dd>
       </dl>
-    </div>
+    </section>
     {{ ui.performance(p) }}
-    {{ ui.modules(p) }}
+    <section class="panel"><h2>{{ icon('cpu') }} Modules <span class="attr">#74 #75</span></h2>{{ ui.bay_cells(p.modules, none) }}</section>
     {{ ui.composition(p) }}
     {{ ui.sustainability(p) }}
     {{ ui.identification(p) }}
     {{ ui.history_card(history) }}
   </div>
 </details>
-
-<script src="{{ url_for('static', filename='defi3.js') }}"></script>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='defi3.js') }}" defer></script>{% endblock %}

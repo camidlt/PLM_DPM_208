@@ -2,43 +2,43 @@
 {% import "_macros.html" as ui with context %}
 {% block title %}{{ p.battery.batteryId }} · Garagiste{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('garage_home') }}">← Scanner une autre batterie</a></p>
+<p style="margin-bottom:16px"><a href="{{ url_for('garage_home') }}">{{ icon('arrow-left') }} Scanner une autre batterie</a></p>
 {{ ui.passport_header(p) }}
 
-<div class="grid side" style="margin-top:16px">
+<div class="grid side" style="margin-top:20px">
   <div>
+    {{ ui.live_bay(p, live) }}
     {{ ui.performance(p) }}
-    {{ ui.modules(p) }}
     {{ ui.safety_card(p) }}
     {{ ui.identification(p) }}
   </div>
   <div>
-    <div class="card" id="report">
-      <h2>Diagnostic</h2>
+    <section class="panel" id="report">
+      <h2>{{ icon('wrench') }} Diagnostic</h2>
       {% if p.battery.status != 'Original' %}
-        <div class="alert info"><span class="icon">ℹ️</span>
-          <div>Statut actuel : <strong>{{ p.battery.status }}</strong>. Aucune action garagiste possible.</div></div>
+        <div class="note info">{{ icon('info') }}<div><strong>Statut actuel : {{ p.battery.status }}</strong>Aucune action garagiste possible sur ce passeport.</div></div>
       {% elif p.pending_request %}
-        <div class="alert warn"><span class="icon">⏳</span>
-          <div><strong>Demande envoyée, en attente du propriétaire</strong>
-          {{ p.pending_request.createdAt|replace('T', ' ') }} · {{ p.pending_request.reason }}</div></div>
+        <div class="note warn">{{ icon('clock') }}<div><strong>Demande envoyée, en attente du propriétaire</strong>{{ p.pending_request.createdAt|ts }} · {{ p.pending_request.reason }}</div></div>
       {% else %}
         {% set alerts = module_alerts(p) %}
-        <p class="small muted">Batterie non réparable ? Signalez-la hors d'usage : le propriétaire du
-          Battery Passport passera son statut à « Waste » et organisera le transfert vers un centre de tri.</p>
+        {% if alerts %}
+          <div class="note hot" style="margin-bottom:6px">{{ icon('triangle-alert') }}<div><strong>{{ alerts|length }} {{ 'modules' if alerts|length > 1 else 'module' }} au-delà du seuil constructeur</strong>{% for m in alerts %}Module {{ m.index }} : {{ m.internalResistance_mOhm }} mΩ (max {{ m.maxInternalResistance_mOhm }} mΩ){% if not loop.last %} · {% endif %}{% endfor %}</div></div>
+        {% endif %}
+        <p class="small mute" style="margin-top:12px">Batterie non réparable sur site ? Signalez-la hors d'usage : le propriétaire du passeport passera son statut à Waste et organisera le transfert vers un centre de tri agréé.</p>
         <form method="post" action="{{ url_for('garage_report', battery_id=p.battery.batteryId) }}"
-              onsubmit="return confirm('Envoyer la demande « hors d\'usage » au propriétaire ?')">
+              onsubmit="return confirm('Envoyer la demande hors d\'usage au propriétaire ?')">
           <label for="fault_type">Défaut constaté</label>
           <select id="fault_type" name="fault_type">
             {% for f in fault_types %}<option {% if alerts and loop.first %}selected{% endif %}>{{ f }}</option>{% endfor %}
           </select>
           <label for="comment">Commentaire</label>
-          <textarea id="comment" name="comment" placeholder="Constat, mesures, réparation impossible…">{% if alerts %}Module {{ alerts[0].index }} hors tolérance, non réparable sur site.{% endif %}</textarea>
-          <button class="btn danger block" style="margin-top:12px" type="submit">Signaler hors d'usage</button>
+          <textarea id="comment" name="comment" placeholder="Constat, mesures, réparation impossible">{% if alerts %}Module {{ alerts[0].index }} hors tolérance, non réparable sur site.{% endif %}</textarea>
+          <button class="btn danger block big" style="margin-top:16px" type="submit">{{ icon('send') }} Signaler hors d'usage</button>
         </form>
       {% endif %}
-    </div>
+    </section>
     {{ ui.history_card(history) }}
   </div>
 </div>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='live.js') }}" defer></script>{% endblock %}

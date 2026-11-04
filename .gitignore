@@ -24,3 +24,8 @@ Thumbs.db
 *.log
 .env
 
+
+# Impeccable : captures et pages de décision locales
+.impeccable/review/
+.impeccable/questions/
+.impeccable/mocks/

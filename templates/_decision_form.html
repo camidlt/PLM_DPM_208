@@ -1,22 +1,22 @@
-<div class="grid two">
+<div class="decide">
   <form method="post" action="{{ url_for('owner_approve', notif_uid=n.uid) }}"
-        onsubmit="return confirm('Passer {{ n.batteryId }} en « Waste » et créer l\'ordre de transfert ?')">
-    <input type="hidden" name="back" value="{{ request.path }}">
-    <label>Centre de tri de destination</label>
-    <select name="destination" required>
+        onsubmit="return confirm('Passer {{ n.batteryId }} en Waste et créer l\'ordre de transfert ?')">
+    <input type="hidden" name="back" value="{{ request.url.path }}">
+    <label for="dest-{{ n.uid }}">Centre de tri de destination</label>
+    <select id="dest-{{ n.uid }}" name="destination" required>
       {% for c in centers %}
         <option value="{{ c.uid }}" {% if not c.agreed %}disabled{% endif %}>
-          {{ c.name }} ({{ c.city }}) {{ '· agréé ' ~ c.agreementNumber if c.agreed else '· NON agréé' }}</option>
+          {{ c.name }} ({{ c.city }}) {{ '· agréé ' ~ c.agreementNumber if c.agreed else '· non agréé' }}</option>
       {% endfor %}
     </select>
-    <label>Commentaire (optionnel)</label>
-    <input name="comment" placeholder="ex. enlèvement sous 48 h">
-    <button class="btn accent block" style="margin-top:10px" type="submit">✅ Valider : Original → Waste + transfert</button>
+    <label for="cmt-{{ n.uid }}">Commentaire <span class="mute">(optionnel)</span></label>
+    <input id="cmt-{{ n.uid }}" name="comment" placeholder="Enlèvement sous 48 h">
+    <button class="btn primary block" style="margin-top:14px" type="submit">{{ icon('check') }} Valider : Original vers Waste et transfert</button>
   </form>
   <form method="post" action="{{ url_for('owner_reject', notif_uid=n.uid) }}">
-    <input type="hidden" name="back" value="{{ request.path }}">
-    <label>Motif du refus</label>
-    <input name="comment" placeholder="ex. batterie encore sous garantie, à renvoyer à l'usine" required>
-    <button class="btn ghost block" style="margin-top:10px" type="submit">Refuser la demande</button>
+    <input type="hidden" name="back" value="{{ request.url.path }}">
+    <label for="rej-{{ n.uid }}">Motif du refus</label>
+    <input id="rej-{{ n.uid }}" name="comment" placeholder="Encore sous garantie, retour usine" required>
+    <button class="btn ghost block" style="margin-top:14px" type="submit">{{ icon('x') }} Refuser la demande</button>
   </form>
 </div>

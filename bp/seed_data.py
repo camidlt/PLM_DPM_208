@@ -43,7 +43,7 @@ node("EconomicOperator", "EO-FLUX",
      phone="+33 1 00 00 00 00", website="https://fluxmotors.example")
 rel("CMP-FLUX", "HAS_ECONOMIC_OPERATOR", "EO-FLUX")
 
-node("Actor", "OWNER-FLUX", name="Responsable Battery Passport - Flux Motors",
+node("Actor", "OWNER-FLUX", name="Responsable Battery Passport, Flux Motors",
      role="proprietaire", city="Nanterre")
 rel("OWNER-FLUX", "REPRESENTS", "EO-FLUX")
 
@@ -116,29 +116,29 @@ INITIAL_R = {"MOD-FC85": 1.0, "MOD-FC60L": 1.6}
 
 BATTERIES = [
     # La batterie de Doc : un module (n°3) a une résistance interne anormale
-    dict(id="BAT-DOC-001", model="MOD-FC85", serial="FC85-2019-004221", built="2019-03-12",
-         vehicle="DeLorean EV - VIN fictif FLUXDMC1985", status="Original", soh=71, soc=38,
+    dict(id="DLR-1985", model="MOD-FC85", serial="FC85-2019-004221", built="2019-03-12",
+         vehicle="DeLorean EV, VIN fictif FLUXDMC1985", status="Original", soh=71, soc=38,
          cycles=1240, accidents=0, warranty="2027-03-12", location="GARAGE-HV",
          modules=[1.3, 1.4, 6.8, 1.2, 1.5],
          soce=71, capacityFade=29, powerFade=34,
          deepDischargeEvents=0, overchargeEvents=0,
          timeAboveTempMax_min=120, timeBelowTempMin_min=0),
     dict(id="BAT-002", model="MOD-FC85", serial="FC85-2023-118734", built="2023-06-02",
-         vehicle="Flux Roadster - VIN fictif FLUXRD2023", status="Original", soh=93, soc=76,
+         vehicle="Flux Roadster, VIN fictif FLUXRD2023", status="Original", soh=93, soc=76,
          cycles=310, accidents=0, warranty="2031-06-02", location="GARAGE-HV",
          modules=[1.1, 1.1, 1.2, 1.0, 1.1],
          soce=93, capacityFade=7, powerFade=5,
          deepDischargeEvents=0, overchargeEvents=0,
          timeAboveTempMax_min=0, timeBelowTempMin_min=0),
     dict(id="BAT-003", model="MOD-FC60L", serial="FC60L-2020-052310", built="2020-10-20",
-         vehicle="Flux City - VIN fictif FLUXCT2020", status="Original", soh=64, soc=52,
+         vehicle="Flux City, VIN fictif FLUXCT2020", status="Original", soh=64, soc=52,
          cycles=2100, accidents=1, warranty="2028-10-20", location="GARAGE-HV",
          modules=[2.2, 2.1, 2.3, 2.2, 2.4],
          soce=64, capacityFade=36, powerFade=31,
          deepDischargeEvents=2, overchargeEvents=1,
          timeAboveTempMax_min=90, timeBelowTempMin_min=0),
     dict(id="BAT-004", model="MOD-FC85", serial="FC85-2018-001876", built="2018-01-15",
-         vehicle="Flux Roadster - VIN fictif FLUXRD2018", status="Waste", soh=48, soc=0,
+         vehicle="Flux Roadster, VIN fictif FLUXRD2018", status="Waste", soh=48, soc=0,
          cycles=1980, accidents=2, warranty="2026-01-15", location="CT-NANTERRE",
          modules=[3.1, 2.9, 3.4, 3.0, 3.6],
          soce=48, capacityFade=52, powerFade=55,
@@ -147,7 +147,7 @@ BATTERIES = [
     # --- Batteries supplémentaires (défi 3) ---
     # BAT-101 : NMC, SOCE 86 %, modules sains → Reuse attendu
     dict(id="BAT-101", model="MOD-FC85", serial="FC85-2022-090412", built="2022-09-05",
-         vehicle="Flux Roadster - VIN fictif FLUXRD2022 (véhicule épave)", status="Waste",
+         vehicle="Flux Roadster, VIN fictif FLUXRD2022 (véhicule épave)", status="Waste",
          soh=86, soc=40, cycles=400, accidents=0, warranty="2030-09-05", location="CT-NANTERRE",
          modules=[1.1, 1.2, 1.1, 1.2, 1.1],
          soce=86, capacityFade=14, powerFade=11,
@@ -155,7 +155,7 @@ BATTERIES = [
          timeAboveTempMax_min=0, timeBelowTempMin_min=0),
     # BAT-102 : LFP, SOCE 66 %, modules homogènes → Repurpose attendu
     dict(id="BAT-102", model="MOD-FC60L", serial="FC60L-2018-011207", built="2018-04-17",
-         vehicle="Flux City - VIN fictif FLUXCT2018", status="Waste",
+         vehicle="Flux City, VIN fictif FLUXCT2018", status="Waste",
          soh=66, soc=30, cycles=2800, accidents=0, warranty="2026-04-17", location="CT-NANTERRE",
          modules=[2.3, 2.4, 2.3, 2.4, 2.3],
          soce=66, capacityFade=34, powerFade=29,
@@ -163,7 +163,7 @@ BATTERIES = [
          timeAboveTempMax_min=300, timeBelowTempMin_min=0),
     # BAT-103 : NMC, SOCE 55 %, 7 décharges profondes → Recycle (sécurité)
     dict(id="BAT-103", model="MOD-FC85", serial="FC85-2019-007731", built="2019-11-28",
-         vehicle="Flux Roadster - VIN fictif FLUXRD2019", status="Waste",
+         vehicle="Flux Roadster, VIN fictif FLUXRD2019", status="Waste",
          soh=55, soc=0, cycles=1700, accidents=0, warranty="2027-11-28", location="CT-NANTERRE",
          modules=[3.4, 3.1, 3.6, 2.9, 3.3],
          soce=55, capacityFade=45, powerFade=49,
@@ -202,10 +202,10 @@ for b in BATTERIES:
 
     events = [("MANUFACTURED", b["built"] + "T08:00:00", "Flux Motors SAS", "Batterie produite et passeport créé"),
               ("PUT_ON_MARKET", b["built"][:4] + "-12-01T10:00:00", "Flux Motors SAS", "Mise sur le marché")]
-    if b["id"] == "BAT-DOC-001":
-        events.append(("MAINTENANCE", "2024-05-14T14:30:00", "Garage Hill Valley", "Contrôle annuel - RAS"))
+    if b["id"] == "DLR-1985":
+        events.append(("MAINTENANCE", "2024-05-14T14:30:00", "Garage Hill Valley", "Contrôle annuel, RAS"))
     if b["status"] == "Waste":
-        events += [("STATUS_CHANGED", "2026-09-02T11:00:00", "Responsable Battery Passport - Flux Motors", "Original → Waste"),
+        events += [("STATUS_CHANGED", "2026-09-02T11:00:00", "Responsable Battery Passport, Flux Motors", "Original → Waste"),
                    ("RECEIVED", "2026-09-10T15:20:00", "Centre de tri Recyclo Nanterre", "Batterie réceptionnée")]
     for k, (etype, at, actor, details) in enumerate(events, start=1):
         rel(bid, "HAS_EVENT", node("Event", f"EVT-{bid}-{k}", type=etype, at=at,
@@ -222,7 +222,7 @@ DEMANDS = [
          option="Remanufacture", partner="Atelier de reconditionnement Flux Motors",
          chemistries=["NMC 811"], minSoce=60, urgency="normale",
          quantity=8, location="Nanterre", active=True),
-    dict(uid="DEM-A13", title="Stockage d'énergie pour bornes de recharge - aire d'autoroute A13",
+    dict(uid="DEM-A13", title="Stockage d'énergie pour bornes de recharge, aire d'autoroute A13",
          option="Repurpose", partner="Autoroutes Énergie (fictif)",
          chemistries=["LFP"], minSoce=60, urgency="urgente",
          quantity=12, location="Aire de Morainvilliers (A13)", active=True),
@@ -230,7 +230,7 @@ DEMANDS = [
          option="Repurpose", partner="Rider Cycles (fictif)",
          chemistries=["NMC 811"], minSoce=65, urgency="urgente",
          quantity=200, location="Lyon", active=False),
-    dict(uid="DEM-RECYC", title="Recyclage hydrométallurgique - contrat cadre",
+    dict(uid="DEM-RECYC", title="Recyclage hydrométallurgique, contrat cadre",
          option="Recycle", partner="MétauxCirculaires (fictif)",
          chemistries=["NMC 811", "LFP"], minSoce=0, urgency="normale",
          quantity=100, location="Normandie", active=True),

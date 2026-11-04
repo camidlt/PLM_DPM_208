@@ -2,301 +2,299 @@
   <span class="badge st-{{ status }}">{{ status }}</span>
 {%- endmacro %}
 
-{% macro gauge(value) -%}
-  {% set v = value or 0 %}
-  <div class="gauge {{ 'low' if v < 60 else ('mid' if v < 80 else '') }}"><span style="width: {{ v }}%"></span></div>
-{%- endmacro %}
+{% macro na(v, suffix='') -%}{{ (v ~ suffix) if v is not none and v != '' else 'Non renseigné' }}{%- endmacro %}
 
-{% macro passport_header(p) %}
-<div class="card passport-head">
+{% macro passport_header(p, show_qr=true) %}
+{% set b = p.battery %}
+<section class="plate passport-plate" aria-label="Plaque d'identification du passeport">
+  <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
   <div>
-    <div class="muted small">Battery Passport · {{ p.battery.batteryPassportId }}</div>
-    <h1>{{ p.battery.batteryId }}</h1>
-    <div class="row">
-      {{ status_badge(p.battery.status) }}
-      <span class="muted">{{ p.model.name if p.model else '—' }}
-        · {{ p.composition.batteryChemistry if p.composition else '—' }}</span>
+    <h1 class="id">{{ b.batteryId }}</h1>
+    <div class="serial">Passeport {{ b.batteryPassportId }} · N° de série {{ b.serialNumber }}<span class="attr">#1 #2</span></div>
+    <div class="facts">
+      {{ status_badge(b.status) }}
+      <span>{{ icon('battery') }}{{ p.model.name if p.model else 'Modèle non renseigné' }}</span>
+      <span>{{ icon('zap') }}{{ p.composition.batteryChemistry if p.composition else 'Chimie non renseignée' }}</span>
+      {% if p.location %}<span>{{ icon('map-pin') }}{{ p.location.name }}</span>{% endif %}
     </div>
-    {% if p.location %}<div class="small muted" style="margin-top:.4rem">📍 Actuellement chez : {{ p.location.name }}</div>{% endif %}
   </div>
-  <div class="qr" data-qr="{{ base_url }}/b/{{ p.battery.batteryId }}" title="QR code du passeport"></div>
+  {% if show_qr %}
+  <a class="qr-plate" href="{{ url_for('qr_png', battery_id=b.batteryId) }}" title="QR code du passeport (cliquer pour imprimer)">
+    <img src="{{ url_for('qr_png', battery_id=b.batteryId) }}" alt="QR code du passeport {{ b.batteryId }}" width="104" height="104">
+  </a>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{# Signature : baie de 5 cellules sous verre, alimentée en direct par le BMS #}
+{% macro live_bay(p, live, title='Résistance interne des modules') %}
+{% set bid = p.battery.batteryId %}
+<section class="panel" data-live="{{ url_for('api_live', battery_id=bid) }}" aria-live="polite">
+  <div class="row between" style="margin-bottom:14px">
+    <h2 style="margin:0">{{ icon('cpu') }} {{ title }} <span class="attr">#74 #75</span></h2>
+    {% set alerts = module_alerts(p) %}
+    <span class="badge {{ 'st-Waste' if alerts else 'st-RECEIVED' }}" data-summary>{{ (alerts|length ~ (' modules hors seuil' if alerts|length > 1 else ' module hors seuil')) if alerts else 'Modules dans les tolérances' }}</span>
+  </div>
+  {{ bay_cells(p.modules, live) }}
+  {{ device_strip(live) }}
+</section>
+{% endmacro %}
+
+{% macro bay_cells(modules, live) %}
+<div class="bay">
+  {% for m in modules %}
+    {% set r = m.internalResistance_mOhm or 0 %}{% set rmax = m.maxInternalResistance_mOhm or 2 %}
+    <div class="cell" data-index="{{ m.index }}" data-health="{{ m.health or 'OK' }}" data-max="{{ rmax }}" data-r="{{ r }}">
+      <div class="head"><span class="mid">M{{ m.index }}</span><span class="led" aria-hidden="true"></span></div>
+      <div class="read"><span data-val>{{ '%.2f'|format(r) }}</span><small>mΩ<span class="mx"> · max {{ rmax }}</span></small></div>
+      <div class="column" aria-hidden="true">
+        <span class="tick" style="bottom:25%"></span><span class="tick" style="bottom:75%"></span>
+        <span class="max" style="bottom:50%"><span>max</span></span>
+        <span class="fill" style="height: {{ [100, r / (rmax * 2) * 100]|min|round(1) }}%"></span>
+      </div>
+      <svg class="trace" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><polyline points=""></polyline></svg>
+      <div class="cfoot"><span data-health-label>{{ {'OK': 'Nominal', 'WARNING': 'Surveillance', 'CRITICAL': 'Critique'}[m.health or 'OK'] }}</span><span data-temp>{{ ('%.1f °C'|format(m.lastTemperature)) if m.lastTemperature else '' }}</span></div>
+    </div>
+  {% endfor %}
+</div>
+<div class="ruler-note">
+  <span><i style="background:var(--r9)"></i>Nominal</span>
+  <span><i style="background:var(--warn)"></i>Surveillance, au moins 80 % du max</span>
+  <span><i style="background:var(--hot)"></i>Critique, au-delà du max sur 3 mesures</span>
+  <span>Colonne pleine : 2 fois le max constructeur</span>
+</div>
+{% endmacro %}
+
+{% macro device_strip(live) %}
+{% set dev = live.device if live else none %}
+<div class="device" data-online="{{ 'true' if live and live.online else 'false' }}" data-device>
+  <span class="state"><span class="led" aria-hidden="true"></span><span data-dev-state>{{ 'BMS ESP32 en ligne' if live and live.online else 'BMS hors ligne' }}</span></span>
+  <span data-dev-detail>{% if dev %}{{ dev.source }} · {{ dev.packets }} paquets · vu il y a {{ dev.ageSeconds|round|int }} s{% else %}En attente de l'ESP32 sur /api/telemetry{% endif %}</span>
+  <span data-dev-last>{% if live and live.lastTelemetryAt %}Dernière mesure {{ live.lastTelemetryAt|ts }}{% endif %}</span>
 </div>
 {% endmacro %}
 
 {% macro identification(p) %}
-<div class="card">
-  <h2>Identification</h2>
+<section class="panel">
+  <h2>{{ icon('file-text') }} Identification</h2>
   <dl class="kv">
-    <dt>N° de série</dt><dd>{{ p.battery.serialNumber }}</dd>
+    <dt>N° de série <span class="attr">#2</span></dt><dd>{{ p.battery.serialNumber }}</dd>
     <dt>Modèle</dt><dd>{{ p.model.name }} ({{ p.model.modelId }})</dd>
-    <dt>Type</dt><dd>{{ p.type.name if p.type else '—' }}</dd>
-    <dt>Fabrication</dt><dd>{{ p.battery.manufacturingDate }}</dd>
+    <dt>Catégorie <span class="attr">#9</span></dt><dd>{{ p.type.name if p.type else 'Non renseigné' }}</dd>
+    <dt>Fabrication <span class="attr">#6</span></dt><dd>{{ p.battery.manufacturingDate }}</dd>
     <dt>Véhicule</dt><dd>{{ p.battery.vehicle }}</dd>
-    <dt>Fabricant</dt><dd>{{ p.operator.name if p.operator else '—' }}</dd>
-    <dt>Garantie jusqu'au</dt><dd>{{ p.dynamic_durability.warranty }}</dd>
+    <dt>Fabricant <span class="attr">#4</span></dt><dd>{{ p.operator.name if p.operator else 'Non renseigné' }}</dd>
+    <dt>Garantie jusqu'au</dt><dd>{{ na(p.dynamic_durability.warranty) }}</dd>
   </dl>
-</div>
+</section>
 {% endmacro %}
 
 {% macro performance(p) %}
 {% set dp = p.dynamic_performance %}{% set dd = p.dynamic_durability %}
-<div class="card">
-  <h2>Diagnostic & Paramètres de Santé</h2>
-  <div class="metrics">
-    <div class="metric">
-      <div class="label">SOCE / SOH (#57)</div>
-      <div class="value">{{ dp.soh }} %</div>
-      {{ gauge(dp.soh) }}
-      <div class="small muted" style="margin-top:4px">Seuil d'épuisement constructeur (#83) : <strong>80 %</strong></div>
+<section class="panel">
+  <h2>{{ icon('gauge') }} État de santé</h2>
+  <div class="gauges">
+    <div class="gauge">
+      <div class="label">SOCE / SOH <span class="attr">#57</span></div>
+      <div class="value">{{ dp.soh }}<small> %</small></div>
+      <div class="meter {{ 'low' if (dp.soh or 0) < 80 }}"><span style="width: {{ dp.soh or 0 }}%"></span><i style="left:80%" title="Seuil d'épuisement 80 %"></i></div>
     </div>
-    <div class="metric">
-      <div class="label">SOC / Charge (#58)</div>
-      <div class="value">{{ dp.soc }} %</div>
-      {{ gauge(dp.soc) }}
-      <div class="small muted" style="margin-top:4px">Contexte de mesure</div>
+    <div class="gauge">
+      <div class="label">Charge SOC <span class="attr">#58</span></div>
+      <div class="value">{{ dp.soc }}<small> %</small></div>
+      <div class="meter"><span style="width: {{ dp.soc or 0 }}%"></span></div>
     </div>
-    <div class="metric">
-      <div class="label">Cycles (#77, #78)</div>
+    <div class="gauge">
+      <div class="label">Cycles <span class="attr">#77 #78</span></div>
       <div class="value">{{ dd.cycleCount }}</div>
-      <div class="small muted">/ {{ p.static_durability.expectedBatteryLifetimeCycles if p.static_durability else '?' }} prévus</div>
+      <div class="tiny mute">sur {{ p.static_durability.expectedBatteryLifetimeCycles if p.static_durability else 'n.c.' }} prévus</div>
     </div>
-    <div class="metric">
-      <div class="label">Incidents (#91-93)</div>
-      <div class="value">{{ dd.accidents }} acc.</div>
-      <div class="small muted">0 déch. prof. · 0 surch.</div>
+    <div class="gauge">
+      <div class="label">Incidents <span class="attr">#91 à #93</span></div>
+      <div class="value">{{ dd.accidents or 0 }}<small> acc.</small></div>
+      <div class="tiny mute">{{ dd.deepDischargeEvents or 0 }} décharges profondes · {{ dd.overchargeEvents or 0 }} surcharges</div>
     </div>
   </div>
   {% if p.static_performance %}
-  <p class="small muted" style="margin:.75rem 0 0">
-    ⚡ <strong>Tensions min / nom / max (#59-61)</strong> :
-    {{ p.static_performance.minimalVoltage }} / {{ p.static_performance.nominalVoltage }} / {{ p.static_performance.maximalVoltage }} V
-    · <strong>Puissance restante (#63)</strong> : {{ ((dp.soh / 100.0) * (p.model.ratedCapacity_kWh if p.model else 75) * 1.5)|round(1) }} kW est.
-    · Capacité nominale {{ p.model.ratedCapacity_kWh }} kWh
-    · Mesure : {{ dp.measuredAt|replace('T', ' ') }}
+  <p class="small mute" style="margin-top:14px; max-width:none">
+    Tensions min, nominale, max <span class="attr">#59 à #61</span> : {{ p.static_performance.minimalVoltage }} / {{ p.static_performance.nominalVoltage }} / {{ p.static_performance.maximalVoltage }} V
+    · Capacité nominale {{ p.model.ratedCapacity_kWh }} kWh · Seuil d'épuisement <span class="attr">#83</span> : 80 %
+    · Mesure du {{ dp.measuredAt|ts }}
   </p>
   {% endif %}
-</div>
-{% endmacro %}
-
-{% macro modules(p) %}
-{% set alerts = module_alerts(p) %}
-<div class="card">
-  <h2>Résistance interne des modules</h2>
-  {% if alerts %}
-    <div class="alert bad" style="margin-bottom:12px"><span class="icon">⚠️</span>
-      <div><strong>{{ alerts|length }} module(s) au-delà du seuil constructeur</strong>
-      {% for m in alerts %}Module {{ m.index }} : {{ m.internalResistance_mOhm }} mΩ (max {{ m.maxInternalResistance_mOhm }} mΩ){% if not loop.last %} · {% endif %}{% endfor %}</div></div>
-  {% else %}
-    <div class="alert ok" style="margin-bottom:12px"><span class="icon">✅</span><div>Tous les modules sont dans les tolérances.</div></div>
-  {% endif %}
-  <div class="modules">
-    {% for m in p.modules %}
-      {% set hot = m.internalResistance_mOhm > m.maxInternalResistance_mOhm %}
-      {% set pct = [100, (m.internalResistance_mOhm / (m.maxInternalResistance_mOhm * 2) * 100)]|min %}
-      <div class="module {{ 'hot' if hot }}">
-        <span>Module {{ m.index }}</span>
-        <div class="bar"><span style="width: {{ pct|round(0) }}%"></span></div>
-        <span class="val">{{ m.internalResistance_mOhm }} mΩ</span>
-      </div>
-    {% endfor %}
-  </div>
-  <p class="small muted" style="margin:.6rem 0 0">Barre pleine = 2× le seuil max. Dernière mesure BMS :
-    {{ (p.modules[0].measuredAt if p.modules else '—')|replace('T', ' ') }}</p>
-</div>
+</section>
 {% endmacro %}
 
 {% macro composition(p) %}
-<div class="card">
-  <h2>Composition & matériaux</h2>
+<section class="panel">
+  <h2>{{ icon('network') }} Composition et matériaux</h2>
   <dl class="kv">
-    <dt>Chimie</dt><dd>{{ p.composition.batteryChemistry if p.composition else '—' }}</dd>
+    <dt>Chimie <span class="attr">#31</span></dt><dd>{{ p.composition.batteryChemistry if p.composition else 'Non renseignée' }}</dd>
     {% for label, part in [('Cathode', p.cathode), ('Anode', p.anode), ('Électrolyte', p.electrolyte)] %}
       {% if part %}<dt>{{ label }}</dt>
       <dd>{% for mat in part.materialsList %}{{ mat }} {{ part.percentageList[loop.index0] }} %{% if not loop.last %}, {% endif %}{% endfor %}</dd>{% endif %}
     {% endfor %}
   </dl>
-</div>
+</section>
 {% endmacro %}
 
 {% macro sustainability(p) %}
-<div class="card">
-  <h2>Durabilité, conformité & fin de vie</h2>
+<section class="panel">
+  <h2>{{ icon('leaf') }} Durabilité, conformité et fin de vie</h2>
   <dl class="kv">
-    {% if p.carbon_footprint %}<dt>Empreinte carbone</dt><dd>{{ p.carbon_footprint.carbonFootprintDeclared }} {{ p.carbon_footprint.unit }} (classe {{ p.carbon_footprint.performanceClass }})</dd>{% endif %}
-    {% if p.certification %}<dt>Déclaration UE</dt><dd>{{ p.certification.EUDeclarationOfConformityId }}</dd>
-      <dt>Collecte séparée</dt><dd>{{ 'Oui' if p.certification.separateCollectionSymbol else 'Non' }}</dd>{% endif %}
-    {% if p.circularity %}<dt>Agent d'extinction</dt><dd>{{ p.circularity.extinguishAgent }}</dd>
-      <dt>Démantèlement</dt>
-      <dd>
-        <button type="button" onclick="document.getElementById('modal-dismantling-{{ p.battery.batteryId }}').showModal()" style="background:none; border:none; color:var(--info); text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:700; text-align:left;">
-          📖 Manuel constructeur (#36)
-        </button>
-        <span class="badge st-Original" style="margin-left:6px; font-size:.75rem;">Accès réservé</span>
-      </dd>
+    {% if p.carbon_footprint %}<dt>Empreinte carbone <span class="attr">#19 #24</span></dt><dd>{{ p.carbon_footprint.carbonFootprintDeclared }} {{ p.carbon_footprint.unit }}, classe {{ p.carbon_footprint.performanceClass }}</dd>{% endif %}
+    {% if p.certification %}<dt>Déclaration UE <span class="attr">#17</span></dt><dd>{{ p.certification.EUDeclarationOfConformityId }}</dd>
+      <dt>Collecte séparée <span class="attr">#12</span></dt><dd>{{ 'Oui' if p.certification.separateCollectionSymbol else 'Non' }}</dd>{% endif %}
+    {% if p.circularity %}<dt>Agent d'extinction <span class="attr">#15</span></dt><dd>{{ p.circularity.extinguishAgent }}</dd>
+      <dt>Démantèlement <span class="attr">#36</span></dt>
+      <dd><button type="button" class="linkish" onclick="document.getElementById('manual-{{ p.battery.batteryId }}').showModal()">{{ icon('book-open') }} Manuel constructeur</button>
+        <span class="badge st-Original" style="margin-left:6px">Accès réservé</span></dd>
     {% endif %}
   </dl>
-</div>
+</section>
+{% if p.circularity %}{{ manual_dialog(p) }}{% endif %}
+{% endmacro %}
 
-{% if p.circularity %}
-<dialog id="modal-dismantling-{{ p.battery.batteryId }}" class="doc-modal" onclick="if (event.target === this) this.close()">
-  <div class="modal-header">
+{% macro manual_dialog(p) %}
+{% set vmax = p.static_performance.maximalVoltage if p.static_performance else 403 %}
+<dialog id="manual-{{ p.battery.batteryId }}" class="doc" aria-labelledby="manual-title-{{ p.battery.batteryId }}">
+  <header>
     <div>
-      <span class="chip" style="background:rgba(255,255,255,0.2); margin-bottom:4px; display:inline-block;">Règlement UE 2023/1542 · Attribut #36</span>
-      <h3>Manuel Technique de Démontage & Retrait</h3>
+      <h3 id="manual-title-{{ p.battery.batteryId }}">Manuel de démontage et de retrait</h3>
+      <p>Règlement UE 2023/1542, attribut #36 · {{ p.model.name if p.model else 'Pack' }} · {{ p.battery.batteryId }}</p>
     </div>
-    <button type="button" class="doc-btn-close" onclick="document.getElementById('modal-dismantling-{{ p.battery.batteryId }}').close()" title="Fermer">✕</button>
-  </div>
-  <div class="modal-body">
-    <div class="doc-box">
-      <div><strong>Réf. Document :</strong> <code>DOC-DISMANTLE-{{ p.model.modelId if p.model else 'EV' }}-2024</code></div>
-      <div><strong>Modèle de pack :</strong> {{ p.model.name if p.model else 'FluxCap' }} (Chimie : {{ p.composition.batteryChemistry if p.composition else 'NMC' }})</div>
-      <div><strong>Constructeur :</strong> {{ p.operator.name if p.operator else 'Flux Motors SAS' }}</div>
-      <div><strong>Identifiant batterie :</strong> <code>{{ p.battery.batteryId }}</code></div>
-      <div class="small muted" style="margin-top:4px;"><strong>Source constructeur enregistrée :</strong> <code>{{ p.circularity.dismantlingManual }}</code></div>
-    </div>
-
-    <div class="alert warn" style="margin-bottom:14px;">
-      <span class="icon">⚠️</span>
-      <div>
-        <strong>Notice réservée aux professionnels qualifiés & centres de tri agréés</strong><br>
-        L'ouverture du pack batterie présente un risque mortel d'électrisation (haute tension continue jusqu'à <strong>{{ p.static_performance.maximalVoltage if p.static_performance else '403' }} V DC</strong>) et un risque d'emballement thermique.
-      </div>
-    </div>
-
-    <h4>1. Consignes préliminaires & Équipements de Protection Individuelle (EPI)</h4>
-    <p>Intervention strictement subordonnée à l'habilitation électrique Véhicule Électrique (B2VL / B2TL).</p>
+    <button type="button" class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Fermer">{{ icon('x') }}</button>
+  </header>
+  <div class="body">
+    <dl class="kv small">
+      <dt>Référence</dt><dd><code>DOC-DISMANTLE-{{ p.model.modelId if p.model else 'EV' }}-2024</code></dd>
+      <dt>Constructeur</dt><dd>{{ p.operator.name if p.operator else 'Non renseigné' }}</dd>
+      <dt>Source enregistrée</dt><dd><code>{{ p.circularity.dismantlingManual }}</code></dd>
+    </dl>
+    <div class="note hot">{{ icon('triangle-alert') }}<div><strong>Réservé aux professionnels habilités et aux centres de tri agréés</strong>Haute tension continue jusqu'à {{ vmax }} V et risque d'emballement thermique.</div></div>
+    <h4>1. Équipements de protection</h4>
     <ul>
-      <li>Gants isolants composites Classe 0 (1 000 V) conformes NF EN 60903.</li>
-      <li>Écran facial de protection contre l'arc électrique (norme EN 166).</li>
-      <li>Outillage à main isolé 1 000 V conforme IEC 60900.</li>
-      <li>Dispositif de sécurité incendie à proximité immédiate : <strong>{{ p.circularity.extinguishAgent }}</strong>.</li>
+      <li>Habilitation électrique véhicule électrique (B2VL, B2TL).</li>
+      <li>Gants isolants classe 0 (1 000 V, NF EN 60903) et écran facial anti-arc (EN 166).</li>
+      <li>Outillage isolé 1 000 V (IEC 60900). Moyen d'extinction à proximité : {{ p.circularity.extinguishAgent }}.</li>
     </ul>
-
-    <h4>2. Procédure de mise en sécurité & Consignation</h4>
+    <h4>2. Mise en sécurité et consignation</h4>
     <ol>
-      <li><strong>Coupure du connecteur de service haute tension (MSD - Manual Service Disconnect) :</strong> Retirer la prise de coupure physique située sous l'opercule scellé et apposer le cadenas de consignation (LOTO).</li>
-      <li><strong>Attente de décharge capacitive :</strong> Respecter un temps d'attente obligatoire de <strong>5 minutes</strong> pour la décharge complète des condensateurs internes de bus continu.</li>
-      <li><strong>Vérification d'Absence de Tension (VAT) :</strong> Mesurer la tension résiduelle aux bornes du contacteur principal à l'aide d'un VAT étalonné. La tension doit être strictement inférieure à 12 V DC avant d'entamer le démontage.</li>
+      <li>Retirer le connecteur de service haute tension (MSD) et poser le cadenas de consignation.</li>
+      <li>Attendre 5 minutes la décharge des condensateurs du bus continu.</li>
+      <li>Vérifier l'absence de tension au contacteur principal : moins de 12 V DC avant démontage.</li>
     </ol>
-
-    <h4>3. Séquence de démontage & Extraction des modules</h4>
+    <h4>3. Démontage et extraction des modules</h4>
     <ol>
-      <li><strong>Déconnexion basse tension :</strong> Débrancher les connecteurs du contrôleur BMS et les faisceaux de mesure de température (sondes NTC).</li>
-      <li><strong>Dépose du couvercle supérieur :</strong> Dévisser les 16 vis périphériques (Torx T30). Soulever le couvercle à l'aide des anneaux de levage sans détériorer le joint d'étanchéité EPDM.</li>
-      <li><strong>Dépose des barres d'interconnexion (Busbars) :</strong> Déconnecter les liaisons inter-modules à l'aide d'une douille isolée 1000 V (couple de serrage : 9 N·m).</li>
-      <li><strong>Extraction des 5 modules de puissance :</strong> Dévisser les brides de fixation au châssis. Extraire les modules unitairement à la verticale en maintenant une isolation entre les bornes.</li>
+      <li>Débrancher le contrôleur BMS et les sondes de température NTC.</li>
+      <li>Déposer le couvercle (16 vis Torx T30) sans abîmer le joint EPDM.</li>
+      <li>Déconnecter les barres inter-modules à la douille isolée (couple 9 N·m).</li>
+      <li>Extraire les 5 modules un par un, à la verticale, bornes isolées.</li>
     </ol>
-
-    <h4>4. Critères de qualification en fin de vie (Lien Défi 3 - Aide à la décision)</h4>
-    <div class="doc-box">
-      <strong>Condition Reconditionnement (Remanufacture / Reuse) :</strong><br>
-      La présence et la conformité du présent manuel (#36) sont obligatoires pour autoriser le démontage et le reconditionnement. Chaque module doit être testé :
-      <ul>
-        <li>Résistance interne : <strong>R_int ≤ 35 mΩ</strong> (au-delà, module dégradé à écarter).</li>
-        <li>État de santé : <strong>SoH ≥ 70 %</strong>.</li>
-      </ul>
-      Les modules conformes peuvent être réassemblés pour une application seconde vie. Les modules hors tolérance sont orientés vers le recyclage matière par voie hydrométallurgique.
-    </div>
+    <h4>4. Critères de requalification (défi 3)</h4>
+    <ul>
+      <li>Résistance interne par module inférieure ou égale au maximum constructeur.</li>
+      <li>État de santé supérieur ou égal à 70 %. Les modules hors tolérance partent en recyclage hydrométallurgique.</li>
+    </ul>
   </div>
-  <div class="modal-footer">
-    <span class="small muted">Attribut #36 · Conforme règlementation européenne des batteries</span>
-    <button type="button" class="btn ghost" onclick="document.getElementById('modal-dismantling-{{ p.battery.batteryId }}').close()">Fermer</button>
-  </div>
+  <footer><span class="small mute">Attribut #36 · Règlement européen sur les batteries</span>
+    <button type="button" class="btn ghost" onclick="this.closest('dialog').close()">Fermer</button></footer>
 </dialog>
-{% endif %}
 {% endmacro %}
 
 {% macro history_card(history) %}
-<div class="card">
-  <h2>Historique</h2>
+<section class="panel">
+  <h2>{{ icon('history') }} Historique</h2>
   <ul class="timeline">
     {% for e in history %}
       <li class="ev-{{ e.type }}">
-        <div class="when">{{ e.at|replace('T', ' ') }} · {{ e.actorName }}</div>
+        <div class="when">{{ e.at|ts }} · {{ e.actorName }}</div>
         <strong>{{ event_label.get(e.type, e.type) }}</strong>
-        <div class="small">{{ e.details }}</div>
+        <div class="det">{{ e.details }}</div>
       </li>
     {% else %}<li>Aucun événement.</li>{% endfor %}
   </ul>
-</div>
+</section>
 {% endmacro %}
 
 {% macro transfer_card(p) %}
 {% if p.transfer %}{% set t = p.transfer %}
-<div class="card">
-  <h2>Transfert & Logistique ADR</h2>
+<section class="panel">
+  <h2>{{ icon('truck') }} Transfert et logistique</h2>
   <dl class="kv">
     <dt>Ordre</dt><dd>{{ t.uid }} {{ status_badge(t.state) }}</dd>
-    <dt>De</dt><dd>{{ t.fromName or '—' }}</dd>
-    <dt>Vers</dt><dd>{{ t.toName }} {% if t.toAgreed %}<span class="badge st-APPROVED">agréé</span>{% endif %}</dd>
-    <dt>Créé le</dt><dd>{{ t.createdAt|replace('T', ' ') }}</dd>
-    {% if t.receivedAt %}<dt>Reçu le</dt><dd>{{ t.receivedAt|replace('T', ' ') }}</dd>{% endif %}
-    <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (manutention lourde)</dd>
-    <dt>Transport (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · UN 3480 Classe 9</span></dd>
-    <dt>Agent d'extinction (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
+    <dt>Départ</dt><dd>{{ t.fromName or 'Non renseigné' }}</dd>
+    <dt>Destination</dt><dd>{{ t.toName }}{% if t.toAgreed %} <span class="badge st-APPROVED">agréé</span>{% endif %}</dd>
+    <dt>Créé le</dt><dd>{{ t.createdAt|ts }}</dd>
+    {% if t.receivedAt %}<dt>Reçu le</dt><dd>{{ t.receivedAt|ts }}</dd>{% endif %}
+    <dt>Masse <span class="attr">#10</span></dt><dd>{{ p.battery.weightKg or 450 }} kg, manutention lourde</dd>
+    <dt>Transport <span class="attr">#34</span></dt><dd>Matière dangereuse ADR, UN 3480, classe 9</dd>
   </dl>
-</div>
+</section>
 {% endif %}
 {% endmacro %}
 
 {% macro safety_card(p) %}
-<div class="card">
-  <h2>Sécurité & Manipulation (#15, #39)</h2>
+<section class="panel">
+  <h2>{{ icon('shield-check') }} Sécurité et manipulation</h2>
   <dl class="kv">
-    <dt>Agent d'extinction (#15)</dt>
-    <dd><strong>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</strong></dd>
-    <dt>Consignes de sécurité (#39)</dt>
-    <dd>Équipement EPI haute tension obligatoire (1000V). Ne pas percer. En cas de dégagement de fumée ou surchauffe, isoler dans un bac de confinement ignifugé.</dd>
-    <dt>Classification risque (#34)</dt>
-    <dd>UN 3480 Batteries lithium-ion (Classe 9)</dd>
+    <dt>Agent d'extinction <span class="attr">#15</span></dt>
+    <dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau, refroidissement massif' }}</dd>
+    <dt>Consignes <span class="attr">#39</span></dt>
+    <dd>EPI haute tension 1 000 V obligatoires. Ne pas percer. En cas de fumée ou de surchauffe, isoler dans un bac de confinement ignifugé.</dd>
+    <dt>Classification <span class="attr">#34</span></dt>
+    <dd>UN 3480, batteries lithium-ion, classe 9</dd>
   </dl>
-</div>
+</section>
 {% endmacro %}
 
 {% macro public_view(p) %}
-<div class="card">
-  <h2>Informations Générales Publiques</h2>
+<section class="panel">
+  <h2>{{ icon('file-text') }} Informations publiques</h2>
   <dl class="kv">
-    <dt>Identifiant batterie (#1, #2)</dt><dd><strong>{{ p.battery.batteryId }}</strong> (Passeport : {{ p.battery.batteryPassportId }})</dd>
-    <dt>Fabricant (#4)</dt><dd>{{ p.operator.name if p.operator else (p.company.name if p.company else 'Flux Motors') }}</dd>
-    <dt>Date & Lieu de fabrication (#5, #6)</dt><dd>{{ p.battery.manufacturingDate }} (Lieu certifié UE)</dd>
-    <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'Batterie de traction pour véhicule électrique (EV)' }}</dd>
-    <dt>Masse (#10)</dt><dd>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</dd>
-    <dt>Chimie cellulaire (#31)</dt><dd><strong>{{ p.composition.batteryChemistry if p.composition else 'NMC' }}</strong></dd>
+    <dt>Identifiant <span class="attr">#1 #2</span></dt><dd>{{ p.battery.batteryId }}, passeport {{ p.battery.batteryPassportId }}</dd>
+    <dt>Fabricant <span class="attr">#4</span></dt><dd>{{ p.operator.name if p.operator else 'Non renseigné' }}</dd>
+    <dt>Date de fabrication <span class="attr">#5 #6</span></dt><dd>{{ p.battery.manufacturingDate }}</dd>
+    <dt>Catégorie <span class="attr">#9</span></dt><dd>{{ p.type.name if p.type else 'Batterie de traction pour véhicule électrique' }}</dd>
+    <dt>Masse <span class="attr">#10</span></dt><dd>{{ p.battery.weightKg or 450 }} kg</dd>
+    <dt>Chimie <span class="attr">#31</span></dt><dd>{{ p.composition.batteryChemistry if p.composition else 'Non renseignée' }}</dd>
   </dl>
-</div>
-
-<div class="card">
-  <h2>Empreinte Carbone & Économie Circulaire</h2>
+</section>
+<section class="panel">
+  <h2>{{ icon('leaf') }} Empreinte carbone et économie circulaire</h2>
   <dl class="kv">
     {% if p.carbon_footprint %}
-      <dt>Empreinte carbone déclarée (#19)</dt><dd>{{ p.carbon_footprint.carbonFootprintDeclared }} {{ p.carbon_footprint.unit }}</dd>
-      <dt>Classe de performance (#24)</dt><dd><span class="badge st-APPROVED">Classe {{ p.carbon_footprint.performanceClass }}</span></dd>
+      <dt>Empreinte déclarée <span class="attr">#19</span></dt><dd>{{ p.carbon_footprint.carbonFootprintDeclared }} {{ p.carbon_footprint.unit }}</dd>
+      <dt>Classe de performance <span class="attr">#24</span></dt><dd>Classe {{ p.carbon_footprint.performanceClass }}</dd>
     {% endif %}
-    <dt>Part de matières recyclées (#44-48)</dt>
-    <dd>Cobalt : 16 % · Lithium : 6 % · Nickel : 18 % · Plomb : 85 % (Conforme objectifs 2031)</dd>
+    <dt>Matières recyclées <span class="attr">#44 à #48</span></dt><dd>Cobalt 16 % · Lithium 6 % · Nickel 18 % · Plomb 85 %</dd>
     {% if p.certification %}
-      <dt>Déclaration UE (#17)</dt><dd>{{ p.certification.EUDeclarationOfConformityId }}</dd>
-      <dt>Symboles de tri (#12)</dt><dd>{{ 'Poubelle barrée (EN IEC 62902) & collecte séparée' if p.certification.separateCollectionSymbol else 'Collecte séparée' }}</dd>
+      <dt>Déclaration UE <span class="attr">#17</span></dt><dd>{{ p.certification.EUDeclarationOfConformityId }}</dd>
+      <dt>Symbole de tri <span class="attr">#12</span></dt><dd>{{ 'Poubelle barrée (EN IEC 62902), collecte séparée' if p.certification.separateCollectionSymbol else 'Collecte séparée' }}</dd>
     {% endif %}
   </dl>
-</div>
+</section>
 {% endmacro %}
 
 {% macro scan_box(batteries, title='Scanner une batterie') %}
-<div class="card">
-  <h2>{{ title }}</h2>
-  <p class="small muted">Scannez le QR code avec la caméra, ou saisissez l'identifiant inscrit sous le QR code.</p>
-  <button type="button" class="btn accent block" id="start-scan">📷 Scanner le QR code</button>
+<section class="plate">
+  <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+  <h2 class="engrave" style="font-weight:400; font-size:1rem">{{ title }}</h2>
+  <p class="small mute" style="margin-top:6px">Scannez le QR code collé sur la batterie, ou saisissez l'identifiant gravé dessous.</p>
+  <button type="button" class="btn primary block" id="start-scan" style="margin-top:16px">{{ icon('scan-line') }} Scanner le QR code</button>
   <div id="reader"></div>
-  <form action="{{ url_for('scan') }}" method="get" class="scan-row" style="margin-top:8px">
-    <input name="code" placeholder="ex. BAT-DOC-001" aria-label="Identifiant de batterie" autocapitalize="characters">
-    <button class="btn" type="submit">Ouvrir</button>
+  <form action="{{ url_for('scan') }}" method="get" style="margin-top:12px">
+    <label for="code">Identifiant de la batterie</label>
+    <div class="field-row">
+      <input id="code" name="code" placeholder="DLR-1985" autocapitalize="characters" autocomplete="off" required>
+      <button class="btn" type="submit">Ouvrir {{ icon('arrow-right') }}</button>
+    </div>
   </form>
-  {% if batteries %}
-  <details style="margin-top:12px"><summary class="small">Batteries de démo</summary>
-    <div class="row small">{% for b in batteries %}<a href="{{ url_for('scan', code=b.batteryId) }}">{{ b.batteryId }}</a>{% endfor %}</div>
-  </details>
-  {% endif %}
-</div>
+</section>
+{% if batteries %}
+<section class="panel">
+  <h2>{{ icon('battery') }} Batteries de démonstration</h2>
+  <div class="chips">{% for b in batteries %}<a class="chip" href="{{ url_for('scan', code=b.batteryId) }}">{{ b.batteryId }} {{ status_badge(b.status) }}</a>{% endfor %}</div>
+</section>
+{% endif %}
 {% endmacro %}

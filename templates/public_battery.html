@@ -1,31 +1,29 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui with context %}
-{% block title %}Passeport {{ p.battery.batteryId }} · Consultation Publique{% endblock %}
+{% block title %}Passeport {{ p.battery.batteryId }} · Consultation publique{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
 {% block content %}
-<div class="card passport-head">
+<section class="plate passport-plate" aria-label="Plaque d'identification">
+  <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
   <div>
-    <div class="muted small">Passeport Européen de Batterie (Règlement UE 2023/1542)</div>
-    <h1>{{ p.battery.batteryId }}</h1>
-    <div class="row">
-      <span class="muted">{{ p.model.name if p.model else '—' }} · {{ p.composition.batteryChemistry if p.composition else '—' }}</span>
+    <h1 class="id">{{ p.battery.batteryId }}</h1>
+    <div class="serial">Passeport européen de batterie, règlement UE 2023/1542</div>
+    <div class="facts">
+      <span>{{ icon('battery') }}{{ p.model.name if p.model else 'Modèle non renseigné' }}</span>
+      <span>{{ icon('zap') }}{{ p.composition.batteryChemistry if p.composition else 'Chimie non renseignée' }}</span>
     </div>
   </div>
-  <div class="qr" data-qr="{{ base_url }}/b/{{ p.battery.batteryId }}" title="QR code public"></div>
-</div>
+  <a class="qr-plate" href="{{ url_for('qr_png', battery_id=p.battery.batteryId) }}"><img src="{{ url_for('qr_png', battery_id=p.battery.batteryId) }}" alt="QR code public" width="104" height="104"></a>
+</section>
 
-<div class="alert info" style="margin-top:16px">
-  <span class="icon">ℹ️</span>
+<div class="note info" style="margin:20px 0">
+  {{ icon('lock') }}
   <div>
-    <strong>Accès Public (Règle réglementaire - Annexe XIII)</strong><br>
-    Vous consultez les caractéristiques environnementales et techniques publiques de cette batterie. 
-    Les données d'état de santé dynamique (#57), l'historique et le statut (#11) sont réservés aux professionnels ayant un intérêt légitime (Garagiste, Constructeur, Centre de tri).
-    {% if not user %}
-      <div style="margin-top:6px"><a href="{{ url_for('login', next=request.path) }}" style="text-decoration:underline">Professionnel ? Connectez-vous</a></div>
-    {% endif %}
+    <strong>Accès public, Annexe XIII</strong>
+    Vous consultez les caractéristiques techniques et environnementales publiques. L'état de santé (#57), l'historique et le statut (#11) sont réservés aux professionnels ayant un intérêt légitime : garagiste, constructeur, centre de tri.
+    {% if not user %}<div style="margin-top:8px"><a href="{{ url_for('login', next=request.url.path) }}">{{ icon('log-in') }} Professionnel ? Connectez-vous</a></div>{% endif %}
   </div>
 </div>
 
-{{ ui.public_view(p) }}
+<div class="stack">{{ ui.public_view(p) }}</div>
 {% endblock %}
-

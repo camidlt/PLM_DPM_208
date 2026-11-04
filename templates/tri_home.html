@@ -3,17 +3,23 @@
 {% block title %}Centre de tri · Battery Passport{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
 {% block content %}
-<h1>Réception des batteries</h1>
-{{ ui.scan_box(batteries, 'Scanner une batterie reçue') }}
-<div class="card">
-  <h2>Transferts attendus</h2>
-  {% for t in transfers %}
-    <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:.5rem 0">
-      <a href="{{ url_for('tri_battery', battery_id=t.batteryId) }}"><strong>{{ t.batteryId }}</strong></a>
-      <span>{{ ui.status_badge(t.state) }}</span>
-      <span class="small muted" style="width:100%">Ordre {{ t.uid }} · {{ t.createdAt|replace('T', ' ') }}</span>
-    </div>
-  {% else %}<p class="muted">Aucun transfert vers votre centre pour le moment.</p>{% endfor %}
+<div class="stack">
+  <div>
+    <h1>Quai de réception</h1>
+    <p class="mute" style="margin-top:8px">{{ user.display }}. Une batterie n'est prise en charge que si son passeport est au statut Waste et que l'ordre de transfert vous est destiné.</p>
+  </div>
+  {{ ui.scan_box(batteries, 'Scanner une batterie reçue') }}
+  <section class="panel">
+    <h2>{{ icon('truck') }} Transferts attendus</h2>
+    {% for t in transfers %}
+      <div class="row between" style="padding:12px 0; border-bottom:1px solid var(--rim)">
+        <a href="{{ url_for('tri_battery', battery_id=t.batteryId) }}" class="etched" style="color:var(--ink); text-decoration:none">{{ t.batteryId }}</a>
+        {{ ui.status_badge(t.state) }}
+        <span class="tiny mute" style="width:100%">Ordre {{ t.uid }} · {{ t.createdAt|ts }}</span>
+      </div>
+    {% else %}<p class="mute">Aucun transfert vers votre centre pour le moment.</p>{% endfor %}
+    <p style="margin-top:14px"><a href="{{ url_for('tri_market') }}">{{ icon('shopping-cart') }} Demandes du marché</a></p>
+  </section>
 </div>
 {% endblock %}
 {% block scripts %}{% include "_scan_scripts.html" %}{% endblock %}

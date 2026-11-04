@@ -7,9 +7,10 @@ import copy
 import json
 import threading
 import uuid
+from collections import deque
 from datetime import datetime
 
-from . import seed_data
+from . import seed_data, telemetry
 
 
 def now():
@@ -33,6 +34,12 @@ class MemoryRepo:
             self.nodes = {uid: {"_label": label, **copy.deepcopy(props)}
                           for label, uid, props in seed_data.NODES}
             self.rels = [list(r) for r in seed_data.RELS]
+            self.series = {}  # (batteryId, index de module) -> mesures récentes
+            for n in self.nodes.values():
+                if n["_label"] == "Module":
+                    n.setdefault("health", telemetry.health_from_value(
+                        n.get("internalResistance_mOhm"), n.get("maxInternalResistance_mOhm")))
+                    n.setdefault("consecutiveOver", 0)
 
     def _add(self, label, uid, **props):
         self.nodes[uid] = {"_label": label, "uid": uid, **props}
@@ -232,9 +239,61 @@ class MemoryRepo:
                 self.rels.append([uid, "FULFILLS", demand_uid])
             detail = f"Décision : {chosen} (recommandé : {result['recommendation']})"
             if comment and comment.strip():
-                detail += f" - {comment.strip()}"
+                detail += f" : {comment.strip()}"
             self._event(b["uid"], "DECISION_RECORDED", center_uid, detail)
             return uid
+
+    # --- défi 1 : télémétrie BMS ------------------------------------------------
+    def record_telemetry(self, battery_id, readings, ts=None, source="BMS"):
+        """Écrit les mesures d'un paquet BMS. Renvoie la liste des alertes ouvertes."""
+        ts = ts or now()
+        with self.lock:
+            b = self._battery(battery_id)
+            if b is None:
+                raise telemetry.TelemetryError(f"Batterie {battery_id} inconnue.")
+            mods = {m["index"]: m for m in self._out(b["uid"], "HAS_MODULE")}
+            raised = []
+            for rd in readings:
+                m = mods.get(rd["index"])
+                if m is None:
+                    continue
+                rmax = m.get("maxInternalResistance_mOhm")
+                was = m.get("health")
+                health, over = telemetry.next_health(rd["r"], rmax, m.get("consecutiveOver", 0))
+                m.update(internalResistance_mOhm=rd["r"], measuredAt=ts, health=health,
+                         consecutiveOver=over, lastVoltage=rd["v"], lastCurrent=rd["i"],
+                         lastTemperature=rd["t"], source=source)
+                key = (battery_id, rd["index"])
+                self.series.setdefault(key, deque(maxlen=telemetry.HISTORY_POINTS)).append(
+                    dict(ts=ts, r=rd["r"], v=rd["v"], i=rd["i"], t=rd["t"]))
+                if health == "CRITICAL" and was != "CRITICAL":
+                    msg = telemetry.alert_message(rd["index"], rd["r"], rmax)
+                    a = self._add("Alert", new_uid("ALERT"), level="CRITICAL", at=ts, open=True,
+                                  module=rd["index"], value=rd["r"], threshold=rmax, message=msg)
+                    self.rels.append([m["uid"], "RAISED", a])
+                    ev = self._add("Event", new_uid("EVT"), type="BMS_ALERT", at=ts,
+                                   actorName=f"BMS ({source})", details=msg)
+                    self.rels.append([b["uid"], "HAS_EVENT", ev])
+                    raised.append(msg)
+            b["lastTelemetryAt"] = ts
+            return raised
+
+    def get_telemetry(self, battery_id, limit=60):
+        with self.lock:
+            b = self._battery(battery_id)
+            if b is None:
+                return None
+            mods = sorted(self._out(b["uid"], "HAS_MODULE"), key=lambda m: m["index"])
+            return dict(
+                batteryId=battery_id, lastTelemetryAt=b.get("lastTelemetryAt"),
+                modules=[dict(index=m["index"], r=m.get("internalResistance_mOhm"),
+                              rmax=m.get("maxInternalResistance_mOhm"), health=m.get("health"),
+                              t=m.get("lastTemperature"), v=m.get("lastVoltage"),
+                              at=m.get("measuredAt"),
+                              points=list(self.series.get((battery_id, m["index"]), []))[-limit:])
+                         for m in mods],
+                alerts=sorted((self._clean(a) for m in mods for a in self._out(m["uid"], "RAISED")),
+                              key=lambda a: a["at"], reverse=True))
 
     # --- écritures (appelées par bp.workflow après contrôle des règles) ---------
     def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,

@@ -3,27 +3,25 @@
 {% block title %}Demandes du marché · Centre de tri{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
 {% block content %}
-<p><a href="{{ back if back.startswith('/tri/') else url_for('tri_home') }}">← Retour</a></p>
+<p style="margin-bottom:16px"><a href="{{ back }}">{{ icon('arrow-left') }} Retour</a></p>
 <h1>Demandes du marché</h1>
-<p class="muted small">Solutions disponibles à l'instant t. Les demandes actives et compatibles (chimie, SOCE minimum)
-  donnent un bonus à l'option correspondante : +20 pts si urgente, +10 si normale (× poids du marché).</p>
+<p class="mute small" style="margin:8px 0 20px">Débouchés disponibles à l'instant. Une demande active et compatible (chimie, SOCE minimum) donne un bonus à l'option qu'elle sert : 20 points si urgente, 10 si normale, multipliés par le poids du marché.</p>
 {% for dm in demands %}
-<div class="card {{ '' if dm.active else 'inactive' }}">
-  <div class="row" style="justify-content:space-between">
-    <strong>{{ dm.title }}</strong>
+<section class="panel {{ '' if dm.active else 'off' }}" style="{{ '' if dm.active else 'opacity:.7' }}">
+  <div class="row between">
+    <h2 style="margin:0">{{ icon('shopping-cart') }} {{ dm.title }}</h2>
     <span class="badge st-{{ 'APPROVED' if dm.active else 'REJECTED' }}">{{ 'active' if dm.active else 'inactive' }}</span>
   </div>
-  <dl class="kv small" style="margin-top:8px">
+  <dl class="kv small" style="margin-top:12px">
     <dt>Option servie</dt><dd>{{ option_fr[dm.option] }}</dd>
     <dt>Partenaire</dt><dd>{{ dm.partner }} · {{ dm.location }}</dd>
-    <dt>Conditions</dt><dd>Chimie {{ dm.chemistries|join(' / ') }}{% if dm.minSoce %} · SOCE ≥ {{ dm.minSoce }} %{% endif %}</dd>
-    <dt>Volume · urgence</dt><dd>{{ dm.quantity }} batteries · {{ dm.urgency }}</dd>
+    <dt>Conditions</dt><dd>Chimie {{ dm.chemistries|join(' / ') }}{% if dm.minSoce %} · SOCE au moins {{ dm.minSoce }} %{% endif %}</dd>
+    <dt>Volume et urgence</dt><dd>{{ dm.quantity }} batteries · {{ dm.urgency }}</dd>
   </dl>
-  <form method="post" action="{{ url_for('tri_market_toggle', demand_uid=dm.uid) }}" style="margin-top:8px">
-    <input type="hidden" name="back" value="{{ back }}">
-    <button class="btn {{ 'ghost' if dm.active else 'accent' }} block" type="submit">{{ 'Désactiver' if dm.active else 'Activer' }}</button>
+  <form method="post" action="{{ url_for('tri_market_toggle', demand_uid=dm.uid) }}" style="margin-top:14px">
+    <input type="hidden" name="back" value="{{ request.url.path }}">
+    <button class="btn {{ 'ghost' if dm.active else 'primary' }} block" type="submit">{{ 'Désactiver' if dm.active else 'Activer' }}</button>
   </form>
-</div>
+</section>
 {% endfor %}
 {% endblock %}
-

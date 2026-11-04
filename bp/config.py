@@ -8,8 +8,8 @@ NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "password")
 NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 
 # URL publique de l'appli, encodée dans les QR codes (mettre l'IP du PC sur le Wi-Fi
-# pour scanner depuis une tablette/un téléphone, ex. http://192.168.1.20:5000)
-BASE_URL = os.environ.get("BP_BASE_URL", "http://localhost:5000").rstrip("/")
+# pour scanner depuis une tablette/un téléphone, ex. http://192.168.1.20:8000)
+BASE_URL = os.environ.get("BP_BASE_URL", "http://localhost:8000").rstrip("/")
 
 SECRET_KEY = os.environ.get("BP_SECRET_KEY", "dev-hackathon-battery-passport")
 
@@ -18,7 +18,7 @@ ACCOUNTS = {
     "garagiste": dict(password="garage123", role="garagiste", actor_uid="GARAGE-HV",
                       display="Garage Hill Valley"),
     "proprietaire": dict(password="owner123", role="proprietaire", actor_uid="OWNER-FLUX",
-                         operator_uid="EO-FLUX", display="Flux Motors - Resp. Battery Passport"),
+                         operator_uid="EO-FLUX", display="Flux Motors, responsable Battery Passport"),
     "centretri": dict(password="tri123", role="centre_tri", actor_uid="CT-NANTERRE",
                       display="Centre de tri Recyclo Nanterre"),
     "centretri2": dict(password="tri123", role="centre_tri", actor_uid="CT-LYON",

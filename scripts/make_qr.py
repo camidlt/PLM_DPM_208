@@ -1,6 +1,6 @@
 """Génère les QR codes (PNG) à imprimer/coller sur les batteries de démo.
 
-Usage :  BP_BASE_URL=http://192.168.1.20:5000 python scripts/make_qr.py
+Usage :  BP_BASE_URL=http://192.168.1.20:8000 python scripts/make_qr.py
 Le QR encode BP_BASE_URL/b/<ID> : scanné avec l'appareil photo d'une tablette ou d'un
 téléphone sur le même Wi-Fi, il ouvre directement le passeport (après connexion).
 Nécessite `qrcode[pil]` (pip install "qrcode[pil]") ou, à défaut, opencv-python.

@@ -1,11 +1,5 @@
-// QR codes affichés dans les passeports (librairie qrcodejs chargée depuis cdnjs)
-document.querySelectorAll("[data-qr]").forEach(function (el) {
-  if (typeof QRCode === "undefined") { el.classList.add("no-lib"); return; }
-  new QRCode(el, { text: el.dataset.qr, width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M });
-});
-
-// Scanner QR par la caméra (html5-qrcode). La caméra n'est autorisée par le navigateur
-// que sur https:// ou http://localhost ; sinon, utiliser l'appareil photo du téléphone.
+// Scanner QR par la caméra (html5-qrcode). Le navigateur n'autorise la caméra que sur
+// https:// ou http://localhost ; sinon, utiliser l'appareil photo natif ou la saisie.
 (function () {
   var btn = document.getElementById("start-scan");
   if (!btn) return;
@@ -15,7 +9,7 @@ document.querySelectorAll("[data-qr]").forEach(function (el) {
       return;
     }
     if (!window.isSecureContext) {
-      alert("Le navigateur bloque la caméra hors https/localhost. Scannez le QR code avec " +
+      alert("Le navigateur bloque la caméra hors https ou localhost. Scannez le QR code avec " +
             "l'appareil photo du téléphone, ou saisissez l'identifiant.");
       return;
     }
@@ -32,7 +26,7 @@ document.querySelectorAll("[data-qr]").forEach(function (el) {
   });
 })();
 
-// Notifications in-app du propriétaire : rafraîchit le compteur toutes les 10 s
+// Propriétaire : compteur de demandes en attente, rafraîchi toutes les 10 s
 (function () {
   var counter = document.querySelector(".bell .count");
   if (!counter) return;

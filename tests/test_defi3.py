@@ -7,13 +7,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["BP_BACKEND"] = "memory"
 
 import pytest
+from fastapi.testclient import TestClient
 from app import app, repo
 from bp import decision
 
 TODAY = date(2026, 11, 4)
 EXPECTED = {
     "BAT-101": "Reuse",
-    "BAT-DOC-001": "Remanufacture",
+    "DLR-1985": "Remanufacture",
     "BAT-102": "Repurpose",
     "BAT-103": "Recycle",
     "BAT-004": "Recycle"
@@ -43,7 +44,7 @@ def test_regle_securite():
 
 
 def test_bascule_marche():
-    p = repo.get_passport("BAT-DOC-001")
+    p = repo.get_passport("DLR-1985")
     demands = repo.list_demands()
     res1 = decision.recommend(p, demands, today=TODAY)
     assert res1["recommendation"] == "Remanufacture"
@@ -71,7 +72,7 @@ def test_priorites_du_centre():
 
 
 def test_tri_integration_web_et_onglets():
-    client = app.test_client()
+    client = TestClient(app)
 
     # Login centre de tri
     res = client.post("/login", data={"username": "centretri", "password": "tri123"}, follow_redirects=True)
@@ -80,8 +81,8 @@ def test_tri_integration_web_et_onglets():
     # Consultation de BAT-101 (Waste, situé à CT-NANTERRE)
     res_b = client.get("/tri/b/BAT-101")
     assert res_b.status_code == 200
-    assert b"Aide" in res_b.data or b"Recommandation" in res_b.data
-    assert b"Reuse" in res_b.data
+    assert b"Aide" in res_b.content or b"Recommandation" in res_b.content
+    assert b"Reuse" in res_b.content
 
     # Toggle marché VTT depuis la page avec redirection
     res_toggle = client.post("/tri/market/DEM-VTT/toggle", data={"back": "/tri/b/BAT-101?tab=marche#decision"}, follow_redirects=True)

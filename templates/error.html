@@ -1,4 +1,11 @@
 {% extends "base.html" %}
+{% block title %}Introuvable · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
 {% block content %}
-<div class="card"><h1>Oups</h1><p>{{ message }}</p><a class="btn" href="{{ url_for('index') }}">Retour</a></div>
+<section class="plate">
+  <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+  <h1>Introuvable</h1>
+  <p class="mute" style="margin:10px 0 20px">{{ message }} Vérifiez l'identifiant gravé sous le QR code.</p>
+  <a class="btn" href="{{ url_for('landing') }}">{{ icon('arrow-left') }} Retour à l'accueil</a>
+</section>
 {% endblock %}

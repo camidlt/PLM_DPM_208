@@ -1,0 +1,643 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-04T15:17:02+00:00",
+  "title": "Design System: Battery Passport",
+  "extensions": {
+    "colorMeta": {
+      "r0": {
+        "role": "neutral",
+        "displayName": "Abyss",
+        "canonical": "#050c14",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r1": {
+        "role": "neutral",
+        "displayName": "Casing",
+        "canonical": "#07111c",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r2": {
+        "role": "neutral",
+        "displayName": "Casing Face",
+        "canonical": "#0b1a29",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r3": {
+        "role": "neutral",
+        "displayName": "Raised Face",
+        "canonical": "#102336",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r4": {
+        "role": "neutral",
+        "displayName": "Rim",
+        "canonical": "#172f46",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r5": {
+        "role": "neutral",
+        "displayName": "Rim High",
+        "canonical": "#213d58",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r6": {
+        "role": "neutral",
+        "displayName": "Mid Steel 6",
+        "canonical": "#2f506e",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r7": {
+        "role": "neutral",
+        "displayName": "Mid Steel 7",
+        "canonical": "#4a6a88",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r8": {
+        "role": "neutral",
+        "displayName": "Mid Steel 8",
+        "canonical": "#7790a8",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r9": {
+        "role": "neutral",
+        "displayName": "Soft Steel",
+        "canonical": "#afc0cf",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "r10": {
+        "role": "neutral",
+        "displayName": "Frost",
+        "canonical": "#e6edf3",
+        "tonalRamp": [
+          "#050c14",
+          "#0b1a29",
+          "#172f46",
+          "#2f506e",
+          "#4a6a88",
+          "#7790a8",
+          "#afc0cf",
+          "#e6edf3"
+        ]
+      },
+      "capgemini-anodized": {
+        "role": "primary",
+        "displayName": "Capgemini Anodized Blue",
+        "canonical": "#0070ad",
+        "tonalRamp": [
+          "#001a29",
+          "#003857",
+          "#00598a",
+          "#007dc2",
+          "#00a5ff",
+          "#42bcff",
+          "#8fd7ff",
+          "#d6f1ff"
+        ]
+      },
+      "capgemini-anodized-rim": {
+        "role": "primary",
+        "displayName": "Anodized Rim",
+        "canonical": "#1a86c2",
+        "tonalRamp": [
+          "#051924",
+          "#0a354c",
+          "#105479",
+          "#1776ab",
+          "#1e9be1",
+          "#59b5e9",
+          "#9cd3f2",
+          "#dbeffa"
+        ]
+      },
+      "live-blue": {
+        "role": "secondary",
+        "displayName": "Live Signal Blue",
+        "canonical": "#12abdb",
+        "tonalRamp": [
+          "#031d26",
+          "#073f50",
+          "#0a637f",
+          "#0f8cb3",
+          "#13b8ec",
+          "#51caf1",
+          "#97e0f6",
+          "#d9f4fc"
+        ]
+      },
+      "live-blue-hover": {
+        "role": "secondary",
+        "displayName": "Live Signal Blue, hover",
+        "canonical": "#3cbde6",
+        "tonalRamp": [
+          "#051d24",
+          "#0a3d4d",
+          "#10607a",
+          "#1688ac",
+          "#1db2e2",
+          "#58c6ea",
+          "#9cddf2",
+          "#dbf3fa"
+        ]
+      },
+      "live-ink": {
+        "role": "secondary",
+        "displayName": "Live Ink",
+        "canonical": "#04131d",
+        "tonalRamp": [
+          "#051724",
+          "#0b324c",
+          "#114f79",
+          "#1770aa",
+          "#1f93e0",
+          "#59afe8",
+          "#9ccff1",
+          "#dbeefa"
+        ]
+      },
+      "titanium": {
+        "role": "neutral",
+        "displayName": "Titanium",
+        "canonical": "#c9d2da",
+        "tonalRamp": [
+          "#111518",
+          "#232c33",
+          "#384652",
+          "#4f6273",
+          "#688197",
+          "#8fa2b2",
+          "#bcc8d1",
+          "#e7ebee"
+        ]
+      },
+      "titanium-hi": {
+        "role": "neutral",
+        "displayName": "Titanium Highlight",
+        "canonical": "#dde4ea",
+        "tonalRamp": [
+          "#101519",
+          "#212c36",
+          "#354655",
+          "#4a6378",
+          "#61829e",
+          "#8aa2b7",
+          "#bac8d4",
+          "#e6ebef"
+        ]
+      },
+      "titanium-lo": {
+        "role": "neutral",
+        "displayName": "Titanium Fastener",
+        "canonical": "#aab6c1",
+        "tonalRamp": [
+          "#111518",
+          "#252c32",
+          "#3a4550",
+          "#526270",
+          "#6c8093",
+          "#92a1af",
+          "#bec7d0",
+          "#e7ebee"
+        ]
+      },
+      "titanium-ink": {
+        "role": "neutral",
+        "displayName": "Engraved Ink",
+        "canonical": "#13202c",
+        "tonalRamp": [
+          "#0c151c",
+          "#1a2c3d",
+          "#2a4660",
+          "#3a6287",
+          "#4d82b2",
+          "#7ba2c6",
+          "#b1c8dd",
+          "#e3ebf3"
+        ]
+      },
+      "titanium-mute": {
+        "role": "neutral",
+        "displayName": "Engraved Mute",
+        "canonical": "#33455a",
+        "tonalRamp": [
+          "#0f141a",
+          "#1f2a37",
+          "#324358",
+          "#465f7c",
+          "#5c7da3",
+          "#879fbb",
+          "#b7c6d6",
+          "#e5eaf0"
+        ]
+      },
+      "warning-amber": {
+        "role": "tertiary",
+        "displayName": "Warning Amber",
+        "canonical": "#f2b33d",
+        "tonalRamp": [
+          "#261a03",
+          "#513705",
+          "#815709",
+          "#b67b0c",
+          "#efa110",
+          "#f3ba4e",
+          "#f8d696",
+          "#fcf0d9"
+        ]
+      },
+      "critical-hot": {
+        "role": "tertiary",
+        "displayName": "Critical Hot",
+        "canonical": "#ff6a3d",
+        "tonalRamp": [
+          "#290900",
+          "#571400",
+          "#8a2000",
+          "#c22d00",
+          "#ff3b00",
+          "#ff6e42",
+          "#ffa98f",
+          "#ffe0d6"
+        ]
+      },
+      "recycle-slate": {
+        "role": "neutral",
+        "displayName": "Recycle Slate",
+        "canonical": "#2a3a4c",
+        "tonalRamp": [
+          "#0f141a",
+          "#1f2b38",
+          "#314459",
+          "#455f7d",
+          "#5b7da4",
+          "#859fbc",
+          "#b7c6d7",
+          "#e5eaf0"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Etched Display",
+        "purpose": "Michroma title etched on the landing plate; page h1."
+      },
+      "plate-id": {
+        "displayName": "Plate ID",
+        "purpose": "Battery IDs engraved on passport plates."
+      },
+      "readout": {
+        "displayName": "Status Readout",
+        "purpose": "Défi 3 verdict name and the WASTE / ORIGINAL reception check."
+      },
+      "casing-label": {
+        "displayName": "Casing Label",
+        "purpose": "Cell labels M1 to M5, lid heading, rail wordmark."
+      },
+      "band-headline": {
+        "displayName": "Band Headline",
+        "purpose": "Landing band headings, Archivo 650 at width 125%."
+      },
+      "title": {
+        "displayName": "Panel Title",
+        "purpose": "Panel h2, Archivo 600 at width 118%."
+      },
+      "gauge-value": {
+        "displayName": "Gauge Value",
+        "purpose": "Live numeric readings, tabular."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text, tabular numerals, max 68ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Badges and table headers, uppercase."
+      }
+    },
+    "shadows": [
+      {
+        "name": "rail-drop",
+        "value": "0 1px 0 rgba(255,255,255,.03), 0 10px 30px -12px rgba(0,0,0,.6)",
+        "purpose": "Sticky top rail only."
+      },
+      {
+        "name": "panel-seat",
+        "value": "inset 0 1px 0 rgba(255,255,255,.04), 0 18px 40px -28px rgba(0,0,0,.9)",
+        "purpose": "Top-level panels."
+      },
+      {
+        "name": "glass-bay",
+        "value": "inset 0 1px 0 rgba(255,255,255,.07), inset 0 -20px 40px -30px rgba(18,171,219,.2)",
+        "purpose": "Smoked-glass cell bays."
+      },
+      {
+        "name": "led-glow",
+        "value": "0 0 0 2px rgba(0,0,0,.5), 0 0 12px 2px var(--glow)",
+        "purpose": "Indicator LEDs, tinted by health."
+      },
+      {
+        "name": "primary-lift",
+        "value": "0 10px 24px -14px rgba(18,171,219,.9)",
+        "purpose": "Primary button."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px rgba(18,171,219,.22)",
+        "purpose": "Input focus, with live-blue rim."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "All state transitions (0.2s controls, 0.25 to 0.4s chevrons, switch, LEDs)."
+      },
+      {
+        "name": "cell-ballistics",
+        "value": "damped spring k=70, c=11 (static/live.js)",
+        "purpose": "Live cell readouts and fills; slight overshoot, never an instant jump. Polled every 2 s."
+      },
+      {
+        "name": "device-beat",
+        "value": "beat 1.6s cubic-bezier(.16,1,.3,1) infinite",
+        "purpose": "Online ESP32 LED pulse in live blue."
+      },
+      {
+        "name": "casing-rise",
+        "value": "rise .9s cubic-bezier(.16,1,.3,1), lid delayed .12s",
+        "purpose": "One-time landing entrance; disabled under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "xs",
+        "value": "480px"
+      },
+      {
+        "name": "sm",
+        "value": "520px"
+      },
+      {
+        "name": "mobile-table",
+        "value": "560px"
+      },
+      {
+        "name": "bay-rows",
+        "value": "640px"
+      },
+      {
+        "name": "nav-compact",
+        "value": "860px"
+      },
+      {
+        "name": "decide",
+        "value": "900px"
+      },
+      {
+        "name": "grid",
+        "value": "960px"
+      },
+      {
+        "name": "pack",
+        "value": "1020px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action per view, in reserved live blue.",
+      "html": "<button class=\"ds-btn-primary\">Ouvrir <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 18px; border: 1px solid var(--live, #12abdb); border-radius: 3px; background: var(--live, #12abdb); color: var(--live-ink, #04131d); font-family: Archivo, sans-serif; font-weight: 600; font-stretch: 110%; letter-spacing: .01em; cursor: pointer; box-shadow: 0 10px 24px -14px rgba(18,171,219,.9); transition: background .2s cubic-bezier(.16,1,.3,1), transform .2s cubic-bezier(.16,1,.3,1); } .ds-btn-primary:hover { background: #3cbde6; border-color: #3cbde6; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid #12abdb; outline-offset: 3px; }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Machined secondary action on the casing.",
+      "html": "<button class=\"ds-btn\">Entrer comme garagiste</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 18px; border: 1px solid var(--r5, #213d58); border-radius: 3px; background: var(--r3, #102336); color: var(--r10, #e6edf3); font-family: Archivo, sans-serif; font-weight: 600; font-stretch: 110%; cursor: pointer; transition: background .2s cubic-bezier(.16,1,.3,1), border-color .2s cubic-bezier(.16,1,.3,1); } .ds-btn:hover { background: var(--r4, #172f46); border-color: var(--r6, #2f506e); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid #12abdb; outline-offset: 3px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Recessed r1 well with live-blue caret and focus ring.",
+      "html": "<label class=\"ds-label\">Ouvrir un passeport<input class=\"ds-input\" value=\"DLR-1985\"></label>",
+      "css": ".ds-label { display: block; font-family: Archivo, sans-serif; font-size: .86rem; font-weight: 600; color: #afc0cf; } .ds-input { display: block; width: 100%; margin-top: 6px; min-height: 46px; padding: 10px 12px; font: inherit; font-weight: 400; color: #e6edf3; background: #07111c; border: 1px solid #213d58; border-radius: 3px; caret-color: #12abdb; transition: border-color .2s, box-shadow .2s; } .ds-input:focus { outline: none; border-color: #12abdb; box-shadow: 0 0 0 3px rgba(18,171,219,.22); }"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-settled",
+      "description": "Original in steel, pending in amber, Waste in hot, settled states titanium-filled. No green.",
+      "html": "<span class=\"ds-badge ds-orig\">Original</span> <span class=\"ds-badge ds-pend\">Pending</span> <span class=\"ds-badge ds-hot\">Waste</span> <span class=\"ds-badge ds-set\">Received</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 2px; border: 1px solid currentColor; font-family: Archivo, sans-serif; font-size: .76rem; font-weight: 600; font-stretch: 112%; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; } .ds-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; } .ds-orig { color: #afc0cf; } .ds-pend { color: #f2b33d; } .ds-hot { color: #ff6a3d; } .ds-set { color: #13202c; background: #c9d2da; border-color: #c9d2da; }"
+    },
+    {
+      "name": "Panel with unboxed rows",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "r2 panel; sub-sections are 1px-ruled rows, never nested cards.",
+      "html": "<section class=\"ds-panel\"><h2>Demandes en attente</h2><div class=\"ds-row\"><strong>DLR-1985</strong> Original vers Waste</div><div class=\"ds-row\"><strong>BAT-004</strong> Original vers Waste</div></section>",
+      "css": ".ds-panel { background: #0b1a29; color: #e6edf3; border: 1px solid #172f46; border-radius: 4px; padding: 20px; font-family: Archivo, sans-serif; box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 40px -28px rgba(0,0,0,.9); } .ds-panel h2 { margin: 0 0 14px; font-size: 1.2rem; font-weight: 600; font-stretch: 118%; } .ds-row { padding: 14px 0; border-top: 1px solid #172f46; display: flex; gap: 12px; } .ds-row:first-of-type { border-top: 0; padding-top: 0; }"
+    },
+    {
+      "name": "Titanium Identity Plate",
+      "kind": "custom",
+      "refersTo": "plate",
+      "description": "Flat titanium value shift, two chamfered corners, flat rimmed fasteners, engraved Michroma ID.",
+      "html": "<section class=\"ds-plate\"><i class=\"ds-s tl\"></i><i class=\"ds-s tr\"></i><i class=\"ds-s bl\"></i><i class=\"ds-s br\"></i><div class=\"ds-id\">DLR-1985</div><div class=\"ds-serial\"><span>FC-85 · NMC 811</span><span>Règlement UE 2023/1542</span></div></section>",
+      "css": ".ds-plate { position: relative; color: #13202c; background: linear-gradient(180deg, #dde4ea, #c9d2da); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); padding: 28px 30px; font-family: Archivo, sans-serif; } .ds-s { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #aab6c1; border: 1px solid #7d8b98; } .ds-s.tl { left: 10px; top: 10px; } .ds-s.tr { right: 10px; top: 10px; } .ds-s.bl { left: 10px; bottom: 10px; } .ds-s.br { right: 18px; bottom: 10px; } .ds-id { font-family: Michroma, sans-serif; font-size: 2.2rem; letter-spacing: .04em; line-height: 1; } .ds-serial { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 16px; font-size: .82rem; font-weight: 600; font-stretch: 112%; letter-spacing: .06em; text-transform: uppercase; color: #33455a; } .ds-serial span { border: 1px solid #8592a0; padding: 3px 8px; }"
+    },
+    {
+      "name": "Cell Bay",
+      "kind": "custom",
+      "refersTo": "cell",
+      "description": "Smoked-glass module bay with Michroma label, LED, readout and heat-toned fill against the shared ruler.",
+      "html": "<div class=\"ds-bay\"><div class=\"ds-cell\"><div class=\"ds-h\"><span>M1</span><i class=\"ds-led\"></i></div><div class=\"ds-read\">1.30<small>mΩ · max 2.0</small></div><div class=\"ds-col\"><b style=\"height:32%\"></b><em></em></div></div><div class=\"ds-cell ds-crit\"><div class=\"ds-h\"><span>M3</span><i class=\"ds-led\"></i></div><div class=\"ds-read\">6.80<small>mΩ · max 2.0</small></div><div class=\"ds-col\"><b style=\"height:100%\"></b><em></em></div></div></div>",
+      "css": ".ds-bay { display: grid; grid-template-columns: repeat(2, 130px); gap: 10px; font-family: Archivo, sans-serif; } .ds-cell { --tone: #afc0cf; --glow: transparent; display: flex; flex-direction: column; min-height: 240px; padding: 12px; background: linear-gradient(180deg, rgba(5,12,20,.92), rgba(11,26,41,.92)); border: 1px solid #213d58; border-radius: 3px; box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -20px 40px -30px rgba(18,171,219,.2); color: #e6edf3; } .ds-crit { --tone: #ff6a3d; --glow: rgba(255,106,61,.35); border-color: rgba(255,106,61,.75); } .ds-h { display: flex; justify-content: space-between; align-items: center; font-family: Michroma, sans-serif; font-size: .78rem; letter-spacing: .1em; color: #afc0cf; } .ds-led { width: 9px; height: 9px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 0 2px rgba(0,0,0,.5), 0 0 12px 2px var(--glow); } .ds-read { margin-top: 10px; font-size: 1.6rem; font-weight: 600; font-stretch: 115%; line-height: 1; } .ds-read small { display: block; margin-top: 4px; font-size: .62rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: #7790a8; } .ds-col { position: relative; flex: 1; margin-top: 14px; border-left: 1px solid #213d58; } .ds-col b { position: absolute; left: 6px; right: 0; bottom: 0; background: linear-gradient(180deg, var(--tone), color-mix(in srgb, var(--tone) 35%, transparent)); transition: height .4s cubic-bezier(.16,1,.3,1); } .ds-col em { position: absolute; left: -4px; right: 0; bottom: 50%; border-top: 1px dashed #f2b33d; }"
+    },
+    {
+      "name": "Défi 3 Verdict",
+      "kind": "custom",
+      "refersTo": "verdict",
+      "description": "Anodized Capgemini panel with Michroma recommendation readout.",
+      "html": "<div class=\"ds-verdict\"><div class=\"ds-vname\">REPURPOSE</div><p>Seconde vie en stockage stationnaire.</p><span class=\"ds-vchip\">Score 78 pts</span></div>",
+      "css": ".ds-verdict { padding: 22px; border-radius: 4px; background: #0070ad; color: #eef7fc; font-family: Archivo, sans-serif; } .ds-vname { font-family: Michroma, sans-serif; font-size: 2.2rem; letter-spacing: .05em; line-height: 1.05; } .ds-verdict p { margin: 8px 0 0; color: #d7ecf7; } .ds-vchip { display: inline-flex; margin-top: 14px; padding: 4px 10px; border-radius: 2px; background: rgba(0,0,0,.22); font-size: .82rem; }"
+    },
+    {
+      "name": "Top Rail",
+      "kind": "nav",
+      "refersTo": "rail",
+      "description": "Sticky r0 rail with reversed lockup, Michroma wordmark, soft steel links.",
+      "html": "<header class=\"ds-rail\"><span class=\"ds-mark\">Battery Passport</span><nav><a href=\"#\">Le parcours</a><a href=\"#\">ESP32</a><a href=\"#\">Connexion</a></nav></header>",
+      "css": ".ds-rail { display: flex; align-items: center; gap: 18px; min-height: 64px; padding: 0 16px; background: #050c14; border-bottom: 1px solid #172f46; font-family: Archivo, sans-serif; } .ds-mark { font-family: Michroma, sans-serif; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: #e6edf3; } .ds-rail nav { margin-left: auto; display: flex; gap: 4px; } .ds-rail a { color: #afc0cf; text-decoration: none; font-size: .9rem; padding: 8px 12px; border-radius: 3px; min-height: 40px; display: inline-flex; align-items: center; } .ds-rail a:hover { color: #e6edf3; background: #0b1a29; } .ds-rail a:focus-visible { outline: 2px solid #12abdb; outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Machined Module Housing",
+    "overview": "The site is the battery pack itself: one machined, bead-blasted anodized casing in blue-black, carrying a laser-etched titanium identity plate, five smoked-glass cell bays and a single indicator light. Every surface is a part of that housing. The passport is not a dashboard placed on a page; it is the plate riveted to the casing, and the live module data sits behind glass beside it.\n\nDensity is instrument-like. Values are tabular, every reading carries its unit and provenance, and the hierarchy is carried by material (casing, plate, glass, anodized blue panel) rather than by colour noise. Colour is reserved: one vibrant blue for what is live or can be acted on, one health progression from neutral to amber to hot orange, and Capgemini blue as an anodized surface, never as decoration.\n\nThe system refuses the SaaS hero over a row of role cards, refuses green as a success colour, and refuses nested cards. It serves a projector across the room, a tablet in a workshop and a phone on a loading dock with the same parts.",
+    "keyCharacteristics": [
+      "One eleven-step anodized ramp (r0 to r10) carries every neutral.",
+      "Vibrant blue (#12ABDB) appears only on live or actionable things.",
+      "Titanium plates with chamfered corners and flat rimmed fasteners carry identity.",
+      "Michroma is etched lettering; Archivo (width axis) is everything that is read.",
+      "Chamfers, 1px machined rims and 2 to 4px radii; no soft pills except switches and LEDs.",
+      "French copy, no emoji, no em or en dashes, real drawn Lucide icons only."
+    ],
+    "rules": [
+      {
+        "name": "The Reserved Signal Rule",
+        "body": "Vibrant blue #12ABDB means \"live now\" or \"you can act here\". It is never a heading colour, a decorative accent or a fill for settled states.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Green Rule",
+        "body": "There is no green in the system. A settled state (RECEIVED, APPROVED, Reused, Remanufactured, Repurposed) is a titanium-filled badge with titanium ink. Success is shown by material, not by hue.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Heat Rule",
+        "body": "Health has exactly one progression: neutral steel (r9) to amber (#F2B33D) to hot (#FF6A3D). Every gauge, cell, LED, legend and timeline node uses it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Anodized Panel Rule",
+        "body": "Capgemini blue #0070AD is a surface, applied as a whole band or a whole panel (fin de vie band, verdict, dialog header). It is not used for text, borders or small accents.",
+        "section": "colors"
+      },
+      {
+        "name": "The Etched Only Rule",
+        "body": "Michroma appears only where text is stamped on the part: plate lettering, battery IDs, casing labels and status readouts. Band headings, panel headings and body are Archivo.",
+        "section": "typography"
+      },
+      {
+        "name": "The Width Axis Rule",
+        "body": "Hierarchy is made with Archivo's width axis (100% body, 108 to 112% controls and labels, 118% titles, 125% band headings) before size or colour.",
+        "section": "typography"
+      },
+      {
+        "name": "The Unboxed Rows Rule",
+        "body": "Inside a panel, callouts, requests, device strips and sub-sections are unboxed rows separated by 1px rim rules. A panel never contains another card.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Titanium Rule",
+        "body": "The plate is a flat value shift from titanium-hi to titanium, with plain dark ink. No emboss, no text shadow, no brushed stripes.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** build every neutral from the r0 to r10 ramp.",
+      "**Do** keep live-blue (#12ABDB) for live data and actions only.",
+      "**Do** show settled states as titanium-filled badges.",
+      "**Do** run every health signal through r9, then #F2B33D, then #FF6A3D.",
+      "**Do** use Capgemini blue (#0070AD) as a whole anodized band or panel.",
+      "**Do** set plate lettering, battery IDs, casing labels and status readouts in Michroma; set everything read in Archivo.",
+      "**Do** separate sub-sections inside a panel with 1px rules.",
+      "**Do** use Lucide icons from the sprite at 1.15em (1.5em large), stroke 1.75.",
+      "**Do** write copy in French, with no emoji and no em or en dashes."
+    ],
+    "donts": [
+      "**Don't** use green for success, approval or reception.",
+      "**Don't** nest cards inside a panel.",
+      "**Don't** emboss, shade or brush the titanium plate.",
+      "**Don't** use Michroma for band or panel headings or running text.",
+      "**Don't** use live-blue for headings, decoration or settled states.",
+      "**Don't** use emoji or text glyphs as icons.",
+      "**Don't** let a reading jump; live values always move with ballistics."
+    ]
+  }
+}

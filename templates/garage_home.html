@@ -3,8 +3,12 @@
 {% block title %}Garagiste · Battery Passport{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
 {% block content %}
-<h1>Bonjour 👋</h1>
-<p class="muted">Scannez le QR code de la batterie du véhicule pour consulter son passeport.</p>
-{{ ui.scan_box(batteries) }}
+<div class="stack">
+  <div>
+    <h1>Atelier</h1>
+    <p class="mute" style="margin-top:8px">{{ user.display }}. Scannez la batterie du véhicule pour ouvrir son passeport et sa télémétrie en direct.</p>
+  </div>
+  {{ ui.scan_box(batteries) }}
+</div>
 {% endblock %}
 {% block scripts %}{% include "_scan_scripts.html" %}{% endblock %}

@@ -3,45 +3,69 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050c14">
   <title>{% block title %}Battery Passport{% endblock %}</title>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/michroma-latin-400-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/archivo-latin-wdth-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-  {% if user %}
-  <header class="topbar">
-    <a class="brand" href="{{ url_for('index') }}">Battery<span>Passport</span></a>
-    <span class="chip">{{ role_label[user.role] }}</span>
-    <span class="spacer"></span>
-    {% if user.role == 'proprietaire' %}
-      <a class="bell" href="{{ url_for('owner_home') }}#inbox" title="Notifications">🔔
-        <span class="count" data-n="{{ pending_count }}">{{ pending_count }}</span></a>
-    {% endif %}
-    <span class="small who" style="opacity:.8">{{ user.display }}</span>
-    <a class="link" href="{{ url_for('logout') }}">Déconnexion</a>
+<body class="{% block bodyclass %}{% endblock %}">
+  <header class="rail">
+    <div class="wrap">
+      <a class="lockup" href="{{ url_for('landing') }}" aria-label="Battery Passport, accueil">
+        <img class="esilv" src="{{ url_for('static', filename='brand/esilv-white.svg') }}" alt="ESILV">
+        <span class="x" aria-hidden="true"></span>
+        <img class="cap" src="{{ url_for('static', filename='brand/capgemini-white.svg') }}" alt="Capgemini">
+        <span class="name">Battery Passport</span>
+      </a>
+      <nav aria-label="Navigation principale">
+        {% if user %}
+          <span class="role-tag">{{ icon('user') }} {{ role_label[user.role] }}</span>
+          <a href="{{ url_for('index') }}">{{ icon('gauge') }}<span class="lbl">Mon espace</span></a>
+          {% if user.role == 'proprietaire' %}
+            <a class="bell" href="{{ url_for('owner_home') }}#inbox" aria-label="Demandes en attente : {{ pending_count }}">{{ icon('bell', 'lg') }}<span class="count" data-n="{{ pending_count }}">{{ pending_count }}</span></a>
+          {% endif %}
+          <a href="{{ url_for('logout') }}">{{ icon('log-out') }}<span class="lbl">Déconnexion</span></a>
+        {% else %}
+          {% block publicnav %}
+          <a href="{{ url_for('landing') }}#parcours"><span class="lbl">Le parcours</span></a>
+          <a href="{{ url_for('landing') }}#esp32"><span class="lbl">ESP32</span></a>
+          <a href="{{ url_for('login') }}">{{ icon('log-in') }}<span class="lbl">Connexion</span></a>
+          {% endblock %}
+        {% endif %}
+      </nav>
+    </div>
   </header>
-  {% endif %}
 
   {% block hero %}{% endblock %}
 
-  <main class="wrap {% block wrapclass %}{% endblock %}">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
-    {% endwith %}
-    {% block content %}{% endblock %}
+  <main class="{% block mainclass %}page{% endblock %}">
+    <div class="wrap {% block wrapclass %}{% endblock %}">
+      {% for cat, msg in flashes %}
+        <div class="flash {{ cat }}" role="{{ 'alert' if cat == 'error' else 'status' }}">{{ icon('triangle-alert' if cat == 'error' else 'circle-check') }}<span>{{ msg }}</span></div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </div>
+    {% block after %}{% endblock %}
   </main>
 
-  <footer>
-    PoC Hackathon ESILV × Capgemini Engineering · base : <strong>{{ backend }}</strong>
-    {% if user %} ·
-      <form method="post" action="{{ url_for('admin_reset') }}"
-            onsubmit="return confirm('Réinitialiser toutes les données de démo ?')">
-        <button type="submit">Réinitialiser la démo</button>
-      </form>
-    {% endif %}
+  <footer class="foot">
+    <div class="wrap">
+      <div class="logos">
+        <img src="{{ url_for('static', filename='brand/esilv-white.svg') }}" alt="ESILV">
+        <img src="{{ url_for('static', filename='brand/capgemini-white.svg') }}" alt="Capgemini">
+      </div>
+      <div>Hackathon ESILV x Capgemini Engineering, « Battery to the Future ». Preuve de concept, données fictives.{% if user %} Base : {{ 'Neo4j' if backend == 'neo4j' else 'en mémoire' }}.{% endif %}</div>
+      {% if user %}
+        <form method="post" action="{{ url_for('admin_reset') }}" onsubmit="return confirm('Réinitialiser toutes les données de démo ?')">
+          <button type="submit">Réinitialiser la démo</button>
+        </form>
+      {% endif %}
+    </div>
   </footer>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   {% block scripts %}{% endblock %}
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </body>
 </html>
