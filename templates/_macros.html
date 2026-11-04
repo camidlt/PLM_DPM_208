@@ -126,9 +126,84 @@
     {% if p.certification %}<dt>Déclaration UE</dt><dd>{{ p.certification.EUDeclarationOfConformityId }}</dd>
       <dt>Collecte séparée</dt><dd>{{ 'Oui' if p.certification.separateCollectionSymbol else 'Non' }}</dd>{% endif %}
     {% if p.circularity %}<dt>Agent d'extinction</dt><dd>{{ p.circularity.extinguishAgent }}</dd>
-      <dt>Démantèlement</dt><dd><a href="{{ p.circularity.dismantlingManual }}">Manuel constructeur</a></dd>{% endif %}
+      <dt>Démantèlement</dt>
+      <dd>
+        <button type="button" onclick="document.getElementById('modal-dismantling-{{ p.battery.batteryId }}').showModal()" style="background:none; border:none; color:var(--info); text-decoration:underline; cursor:pointer; padding:0; font:inherit; font-weight:700; text-align:left;">
+          📖 Manuel constructeur (#36)
+        </button>
+        <span class="badge st-Original" style="margin-left:6px; font-size:.75rem;">Accès réservé</span>
+      </dd>
+    {% endif %}
   </dl>
 </div>
+
+{% if p.circularity %}
+<dialog id="modal-dismantling-{{ p.battery.batteryId }}" class="doc-modal" onclick="if (event.target === this) this.close()">
+  <div class="modal-header">
+    <div>
+      <span class="chip" style="background:rgba(255,255,255,0.2); margin-bottom:4px; display:inline-block;">Règlement UE 2023/1542 · Attribut #36</span>
+      <h3>Manuel Technique de Démontage & Retrait</h3>
+    </div>
+    <button type="button" class="doc-btn-close" onclick="document.getElementById('modal-dismantling-{{ p.battery.batteryId }}').close()" title="Fermer">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="doc-box">
+      <div><strong>Réf. Document :</strong> <code>DOC-DISMANTLE-{{ p.model.modelId if p.model else 'EV' }}-2024</code></div>
+      <div><strong>Modèle de pack :</strong> {{ p.model.name if p.model else 'FluxCap' }} (Chimie : {{ p.composition.batteryChemistry if p.composition else 'NMC' }})</div>
+      <div><strong>Constructeur :</strong> {{ p.operator.name if p.operator else 'Flux Motors SAS' }}</div>
+      <div><strong>Identifiant batterie :</strong> <code>{{ p.battery.batteryId }}</code></div>
+      <div class="small muted" style="margin-top:4px;"><strong>Source constructeur enregistrée :</strong> <code>{{ p.circularity.dismantlingManual }}</code></div>
+    </div>
+
+    <div class="alert warn" style="margin-bottom:14px;">
+      <span class="icon">⚠️</span>
+      <div>
+        <strong>Notice réservée aux professionnels qualifiés & centres de tri agréés</strong><br>
+        L'ouverture du pack batterie présente un risque mortel d'électrisation (haute tension continue jusqu'à <strong>{{ p.static_performance.maximalVoltage if p.static_performance else '403' }} V DC</strong>) et un risque d'emballement thermique.
+      </div>
+    </div>
+
+    <h4>1. Consignes préliminaires & Équipements de Protection Individuelle (EPI)</h4>
+    <p>Intervention strictement subordonnée à l'habilitation électrique Véhicule Électrique (B2VL / B2TL).</p>
+    <ul>
+      <li>Gants isolants composites Classe 0 (1 000 V) conformes NF EN 60903.</li>
+      <li>Écran facial de protection contre l'arc électrique (norme EN 166).</li>
+      <li>Outillage à main isolé 1 000 V conforme IEC 60900.</li>
+      <li>Dispositif de sécurité incendie à proximité immédiate : <strong>{{ p.circularity.extinguishAgent }}</strong>.</li>
+    </ul>
+
+    <h4>2. Procédure de mise en sécurité & Consignation</h4>
+    <ol>
+      <li><strong>Coupure du connecteur de service haute tension (MSD - Manual Service Disconnect) :</strong> Retirer la prise de coupure physique située sous l'opercule scellé et apposer le cadenas de consignation (LOTO).</li>
+      <li><strong>Attente de décharge capacitive :</strong> Respecter un temps d'attente obligatoire de <strong>5 minutes</strong> pour la décharge complète des condensateurs internes de bus continu.</li>
+      <li><strong>Vérification d'Absence de Tension (VAT) :</strong> Mesurer la tension résiduelle aux bornes du contacteur principal à l'aide d'un VAT étalonné. La tension doit être strictement inférieure à 12 V DC avant d'entamer le démontage.</li>
+    </ol>
+
+    <h4>3. Séquence de démontage & Extraction des modules</h4>
+    <ol>
+      <li><strong>Déconnexion basse tension :</strong> Débrancher les connecteurs du contrôleur BMS et les faisceaux de mesure de température (sondes NTC).</li>
+      <li><strong>Dépose du couvercle supérieur :</strong> Dévisser les 16 vis périphériques (Torx T30). Soulever le couvercle à l'aide des anneaux de levage sans détériorer le joint d'étanchéité EPDM.</li>
+      <li><strong>Dépose des barres d'interconnexion (Busbars) :</strong> Déconnecter les liaisons inter-modules à l'aide d'une douille isolée 1000 V (couple de serrage : 9 N·m).</li>
+      <li><strong>Extraction des 5 modules de puissance :</strong> Dévisser les brides de fixation au châssis. Extraire les modules unitairement à la verticale en maintenant une isolation entre les bornes.</li>
+    </ol>
+
+    <h4>4. Critères de qualification en fin de vie (Lien Défi 3 - Aide à la décision)</h4>
+    <div class="doc-box">
+      <strong>Condition Reconditionnement (Remanufacture / Reuse) :</strong><br>
+      La présence et la conformité du présent manuel (#36) sont obligatoires pour autoriser le démontage et le reconditionnement. Chaque module doit être testé :
+      <ul>
+        <li>Résistance interne : <strong>R_int ≤ 35 mΩ</strong> (au-delà, module dégradé à écarter).</li>
+        <li>État de santé : <strong>SoH ≥ 70 %</strong>.</li>
+      </ul>
+      Les modules conformes peuvent être réassemblés pour une application seconde vie. Les modules hors tolérance sont orientés vers le recyclage matière par voie hydrométallurgique.
+    </div>
+  </div>
+  <div class="modal-footer">
+    <span class="small muted">Attribut #36 · Conforme règlementation européenne des batteries</span>
+    <button type="button" class="btn ghost" onclick="document.getElementById('modal-dismantling-{{ p.battery.batteryId }}').close()">Fermer</button>
+  </div>
+</dialog>
+{% endif %}
 {% endmacro %}
 
 {% macro history_card(history) %}

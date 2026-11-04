@@ -167,3 +167,82 @@ footer { color: var(--muted); font-size: .8rem; padding: 16px; text-align: cente
 footer form { display: inline; }
 footer button { background: none; border: 0; color: var(--info); text-decoration: underline;
   cursor: pointer; font: inherit; padding: 0; }
+
+/* --- Modal Démantèlement (#36) --- */
+dialog.doc-modal {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0;
+  max-width: 720px;
+  width: 92vw;
+  box-shadow: 0 25px 50px rgba(27, 20, 70, 0.35);
+  background: var(--card);
+  color: var(--ink);
+}
+dialog.doc-modal::backdrop {
+  background: rgba(15, 12, 35, 0.7);
+  backdrop-filter: blur(3px);
+}
+.modal-header {
+  background: linear-gradient(90deg, var(--navy), var(--navy-2));
+  color: #fff;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-header h3 { margin: 0; color: #fff; font-size: 1.15rem; }
+.modal-body {
+  padding: 1.25rem;
+  max-height: 75vh;
+  overflow-y: auto;
+  font-size: .92rem;
+  line-height: 1.5;
+}
+.modal-body h4 {
+  margin: 1.1rem 0 .4rem;
+  font-size: 1rem;
+  color: var(--navy);
+}
+.modal-body ul, .modal-body ol {
+  margin: .3rem 0 .8rem;
+  padding-left: 1.3rem;
+}
+.modal-body li {
+  margin-bottom: .35rem;
+}
+.modal-footer {
+  padding: .75rem 1.25rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg);
+}
+.doc-btn-close {
+  background: rgba(255,255,255,0.2);
+  border: 0;
+  color: #fff;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s;
+}
+.doc-btn-close:hover { background: rgba(255,255,255,0.35); }
+.doc-box {
+  background: var(--bg);
+  border-left: 4px solid var(--info);
+  padding: .75rem 1rem;
+  border-radius: 6px;
+  margin: .75rem 0;
+}
+.doc-box.warn {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
