@@ -14,7 +14,12 @@
 </div>
 {% endif %}
 <div class="grid two" style="margin-top:16px">
-  <div>{{ ui.identification(p) }}{{ ui.performance(p) }}{{ ui.modules(p) }}</div>
+  <div>
+    {{ ui.identification(p) }}
+    {{ ui.performance(p) }}
+    {{ ui.modules(p) }}
+    {{ ui.safety_card(p) }}
+  </div>
   <div>{{ ui.transfer_card(p) }}{{ ui.composition(p) }}{{ ui.sustainability(p) }}{{ ui.history_card(history) }}</div>
 </div>
 {% endblock %}

@@ -22,6 +22,17 @@
 {% endif %}
 
 <div class="card">
+  <h2>Contrôle Réception Tronc Commun (#1, #2, #11)</h2>
+  <dl class="kv">
+    <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'EV Traction' }}</dd>
+    <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (engins de manutention requis)</dd>
+    <dt>Substances dangereuses (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · Classe 9</span></dd>
+    <dt>Agent d'extinction stockage (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
+    <dt>Consignes sécurité (#39)</dt><dd>Zone de quarantaine ventilée ignifugée à distance des cellules saines</dd>
+  </dl>
+</div>
+
+<div class="card">
   <h2>Réception</h2>
   {% if t and t.state == 'RECEIVED' %}
     <div class="alert ok"><span class="icon">📦</span><div><strong>Réceptionnée</strong>

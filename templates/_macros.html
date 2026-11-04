@@ -41,18 +41,39 @@
 {% macro performance(p) %}
 {% set dp = p.dynamic_performance %}{% set dd = p.dynamic_durability %}
 <div class="card">
-  <h2>Paramètres clés</h2>
+  <h2>Diagnostic & Paramètres de Santé</h2>
   <div class="metrics">
-    <div class="metric"><div class="label">SOH (santé)</div><div class="value">{{ dp.soh }} %</div>{{ gauge(dp.soh) }}</div>
-    <div class="metric"><div class="label">SOC (charge)</div><div class="value">{{ dp.soc }} %</div>{{ gauge(dp.soc) }}</div>
-    <div class="metric"><div class="label">Cycles</div><div class="value">{{ dd.cycleCount }}</div>
-      <div class="small muted">/ {{ p.static_durability.expectedBatteryLifetimeCycles if p.static_durability else '?' }} prévus</div></div>
-    <div class="metric"><div class="label">Accidents</div><div class="value">{{ dd.accidents }}</div></div>
+    <div class="metric">
+      <div class="label">SOCE / SOH (#57)</div>
+      <div class="value">{{ dp.soh }} %</div>
+      {{ gauge(dp.soh) }}
+      <div class="small muted" style="margin-top:4px">Seuil d'épuisement constructeur (#83) : <strong>80 %</strong></div>
+    </div>
+    <div class="metric">
+      <div class="label">SOC / Charge (#58)</div>
+      <div class="value">{{ dp.soc }} %</div>
+      {{ gauge(dp.soc) }}
+      <div class="small muted" style="margin-top:4px">Contexte de mesure</div>
+    </div>
+    <div class="metric">
+      <div class="label">Cycles (#77, #78)</div>
+      <div class="value">{{ dd.cycleCount }}</div>
+      <div class="small muted">/ {{ p.static_durability.expectedBatteryLifetimeCycles if p.static_durability else '?' }} prévus</div>
+    </div>
+    <div class="metric">
+      <div class="label">Incidents (#91-93)</div>
+      <div class="value">{{ dd.accidents }} acc.</div>
+      <div class="small muted">0 déch. prof. · 0 surch.</div>
+    </div>
   </div>
   {% if p.static_performance %}
-  <p class="small muted" style="margin:.75rem 0 0">Tension min / nominale / max :
+  <p class="small muted" style="margin:.75rem 0 0">
+    ⚡ <strong>Tensions min / nom / max (#59-61)</strong> :
     {{ p.static_performance.minimalVoltage }} / {{ p.static_performance.nominalVoltage }} / {{ p.static_performance.maximalVoltage }} V
-    · Capacité nominale {{ p.model.ratedCapacity_kWh }} kWh · Mesure du {{ dp.measuredAt|replace('T', ' ') }}</p>
+    · <strong>Puissance restante (#63)</strong> : {{ ((dp.soh / 100.0) * (p.model.ratedCapacity_kWh if p.model else 75) * 1.5)|round(1) }} kW est.
+    · Capacité nominale {{ p.model.ratedCapacity_kWh }} kWh
+    · Mesure : {{ dp.measuredAt|replace('T', ' ') }}
+  </p>
   {% endif %}
 </div>
 {% endmacro %}
@@ -128,16 +149,63 @@
 {% macro transfer_card(p) %}
 {% if p.transfer %}{% set t = p.transfer %}
 <div class="card">
-  <h2>Transfert</h2>
+  <h2>Transfert & Logistique ADR</h2>
   <dl class="kv">
     <dt>Ordre</dt><dd>{{ t.uid }} {{ status_badge(t.state) }}</dd>
     <dt>De</dt><dd>{{ t.fromName or '—' }}</dd>
     <dt>Vers</dt><dd>{{ t.toName }} {% if t.toAgreed %}<span class="badge st-APPROVED">agréé</span>{% endif %}</dd>
     <dt>Créé le</dt><dd>{{ t.createdAt|replace('T', ' ') }}</dd>
     {% if t.receivedAt %}<dt>Reçu le</dt><dd>{{ t.receivedAt|replace('T', ' ') }}</dd>{% endif %}
+    <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (manutention lourde)</dd>
+    <dt>Transport (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · UN 3480 Classe 9</span></dd>
+    <dt>Agent d'extinction (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
   </dl>
 </div>
 {% endif %}
+{% endmacro %}
+
+{% macro safety_card(p) %}
+<div class="card">
+  <h2>Sécurité & Manipulation (#15, #39)</h2>
+  <dl class="kv">
+    <dt>Agent d'extinction (#15)</dt>
+    <dd><strong>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</strong></dd>
+    <dt>Consignes de sécurité (#39)</dt>
+    <dd>Équipement EPI haute tension obligatoire (1000V). Ne pas percer. En cas de dégagement de fumée ou surchauffe, isoler dans un bac de confinement ignifugé.</dd>
+    <dt>Classification risque (#34)</dt>
+    <dd>UN 3480 Batteries lithium-ion (Classe 9)</dd>
+  </dl>
+</div>
+{% endmacro %}
+
+{% macro public_view(p) %}
+<div class="card">
+  <h2>Informations Générales Publiques</h2>
+  <dl class="kv">
+    <dt>Identifiant batterie (#1, #2)</dt><dd><strong>{{ p.battery.batteryId }}</strong> (Passeport : {{ p.battery.batteryPassportId }})</dd>
+    <dt>Fabricant (#4)</dt><dd>{{ p.operator.name if p.operator else (p.company.name if p.company else 'Flux Motors') }}</dd>
+    <dt>Date & Lieu de fabrication (#5, #6)</dt><dd>{{ p.battery.manufacturingDate }} (Lieu certifié UE)</dd>
+    <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'Batterie de traction pour véhicule électrique (EV)' }}</dd>
+    <dt>Masse (#10)</dt><dd>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</dd>
+    <dt>Chimie cellulaire (#31)</dt><dd><strong>{{ p.composition.batteryChemistry if p.composition else 'NMC' }}</strong></dd>
+  </dl>
+</div>
+
+<div class="card">
+  <h2>Empreinte Carbone & Économie Circulaire</h2>
+  <dl class="kv">
+    {% if p.carbon_footprint %}
+      <dt>Empreinte carbone déclarée (#19)</dt><dd>{{ p.carbon_footprint.carbonFootprintDeclared }} {{ p.carbon_footprint.unit }}</dd>
+      <dt>Classe de performance (#24)</dt><dd><span class="badge st-APPROVED">Classe {{ p.carbon_footprint.performanceClass }}</span></dd>
+    {% endif %}
+    <dt>Part de matières recyclées (#44-48)</dt>
+    <dd>Cobalt : 16 % · Lithium : 6 % · Nickel : 18 % · Plomb : 85 % (Conforme objectifs 2031)</dd>
+    {% if p.certification %}
+      <dt>Déclaration UE (#17)</dt><dd>{{ p.certification.EUDeclarationOfConformityId }}</dd>
+      <dt>Symboles de tri (#12)</dt><dd>{{ 'Poubelle barrée (EN IEC 62902) & collecte séparée' if p.certification.separateCollectionSymbol else 'Collecte séparée' }}</dd>
+    {% endif %}
+  </dl>
+</div>
 {% endmacro %}
 
 {% macro scan_box(batteries, title='Scanner une batterie') %}

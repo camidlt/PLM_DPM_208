@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}Passeport {{ p.battery.batteryId }} · Consultation Publique{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<div class="card passport-head">
+  <div>
+    <div class="muted small">Passeport Européen de Batterie (Règlement UE 2023/1542)</div>
+    <h1>{{ p.battery.batteryId }}</h1>
+    <div class="row">
+      <span class="muted">{{ p.model.name if p.model else '—' }} · {{ p.composition.batteryChemistry if p.composition else '—' }}</span>
+    </div>
+  </div>
+  <div class="qr" data-qr="{{ base_url }}/b/{{ p.battery.batteryId }}" title="QR code public"></div>
+</div>
+
+<div class="alert info" style="margin-top:16px">
+  <span class="icon">ℹ️</span>
+  <div>
+    <strong>Accès Public (Règle réglementaire - Annexe XIII)</strong><br>
+    Vous consultez les caractéristiques environnementales et techniques publiques de cette batterie. 
+    Les données d'état de santé dynamique (#57), l'historique et le statut (#11) sont réservés aux professionnels ayant un intérêt légitime (Garagiste, Constructeur, Centre de tri).
+    {% if not user %}
+      <div style="margin-top:6px"><a href="{{ url_for('login', next=request.path) }}" style="text-decoration:underline">Professionnel ? Connectez-vous</a></div>
+    {% endif %}
+  </div>
+</div>
+
+{{ ui.public_view(p) }}
+{% endblock %}
+

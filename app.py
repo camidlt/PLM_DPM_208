@@ -109,10 +109,22 @@ def parse_battery_code(code):
 
 
 @app.route("/b/<battery_id>")
-@login_required()
-def battery_entry(user, battery_id):
-    """Cible des QR codes : renvoie chaque rôle vers sa propre vue de la batterie."""
-    return redirect(url_for(ROLE_BATTERY[user["role"]], battery_id=battery_id))
+def battery_entry(battery_id):
+    """Cible des QR codes :
+       - Utilisateur connecté : orienté vers sa vue métier autorisée (intérêt légitime).
+       - Grand public non connecté : orienté vers la vue publique restreinte (Règle réglementaire).
+    """
+    user = current_user()
+    if user:
+        return redirect(url_for(ROLE_BATTERY[user["role"]], battery_id=battery_id))
+    return redirect(url_for("public_battery", battery_id=battery_id))
+
+
+@app.route("/public/b/<battery_id>")
+def public_battery(battery_id):
+    """Vue publique accessible à tous sans authentification (Annexe XIII)."""
+    p = load_passport(battery_id)
+    return render_template("public_battery.html", p=p)
 
 
 @app.route("/scan")
