@@ -568,3 +568,14 @@ pre.payload .k { color: var(--live); } pre.payload .v { color: var(--ink); } pre
 .band.anodized .outcome .why { color: #e4f1f9; }
 .band.anodized .outcome .opt small { color: #c4e1f1; }
 .access { align-items: start; }
+
+/* défi 3 : ajout et suppression de demandes du marché */
+.demand-ctl { display: flex; align-items: center; gap: 8px; }
+.icon-del { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--rim-hi); border-radius: 3px; background: none; color: var(--mute); cursor: pointer; }
+.icon-del:hover { border-color: var(--hot); color: var(--hot); }
+.add-demand { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rim); }
+.add-demand .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+@media (max-width: 420px) { .add-demand .pair { grid-template-columns: 1fr; } }
+.add-demand fieldset.chems { border: 0; padding: 0; margin: 14px 0 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.add-demand fieldset.chems legend { font-size: .86rem; font-weight: 600; color: var(--soft); margin-bottom: 6px; padding: 0; }
+.add-demand .radio { margin: 0; }

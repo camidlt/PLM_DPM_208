@@ -184,6 +184,21 @@ class MemoryRepo:
             if n and n["_label"] == "MarketDemand":
                 n["active"] = bool(active)
 
+    def add_demand(self, center_uid, title, option, partner, chemistries, min_soce, urgency, quantity=1, location="France"):
+        with self.lock:
+            uid = new_uid("DEM")
+            self._add("MarketDemand", uid, title=title, option=option, partner=partner,
+                      chemistries=chemistries, minSoce=min_soce, urgency=urgency,
+                      quantity=quantity, location=location, active=True)
+            self.rels.append([uid, "OFFERED_TO", center_uid])
+            return uid
+
+    def delete_demand(self, demand_uid):
+        with self.lock:
+            if demand_uid in self.nodes:
+                del self.nodes[demand_uid]
+                self.rels = [r for r in self.rels if r[0] != demand_uid and r[2] != demand_uid]
+
     def get_center_policy(self, center_uid):
         with self.lock:
             n = self.nodes.get(center_uid) or {}

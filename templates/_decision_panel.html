@@ -149,10 +149,16 @@
             <div class="small mute">Demande inactive (fermée par le centre)</div>
           {% endif %}
         </div>
-        <button class="switch" type="submit" role="switch" aria-checked="{{ 'true' if dm.active else 'false' }}"
-                aria-label="{{ 'Désactiver' if dm.active else 'Activer' }} {{ dm.title }}"><span></span></button>
+        <div class="demand-ctl">
+          <button class="switch" type="submit" role="switch" aria-checked="{{ 'true' if dm.active else 'false' }}"
+                  aria-label="{{ 'Désactiver' if dm.active else 'Activer' }} {{ dm.title }}"><span></span></button>
+          <button type="submit" formaction="{{ url_for('tri_market_delete', demand_uid=dm.uid) }}" class="icon-del"
+                  aria-label="Supprimer la demande {{ dm.title }}" onclick="return confirm('Supprimer cette demande du marché ?')">{{ icon('trash-2') }}</button>
+        </div>
       </form>
     {% endfor %}
+
+    {% with back = url_for('tri_battery', battery_id=bid, tab='marche') ~ '#decision', fid = 'dp' %}{% include "_demand_form.html" %}{% endwith %}
   </div>
 
   {# Priorités du centre : 2 choix de politique, enregistrés pour le centre #}

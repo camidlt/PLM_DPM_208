@@ -1,0 +1,54 @@
+{# Ajout d'une demande du marché (défi 3). Variables : back, fid (préfixe d'identifiants) #}
+<details class="add-demand">
+  <summary>{{ icon('plus') }} Ajouter une demande au marché {{ icon('chevron-down', 'chev') }}</summary>
+  <form method="post" action="{{ url_for('tri_market_add') }}">
+    <input type="hidden" name="back" value="{{ back }}">
+    <label for="{{ fid }}-title">Besoin</label>
+    <input id="{{ fid }}-title" name="title" required placeholder="Stockage solaire pour une ferme agricole">
+    <div class="pair">
+      <div>
+        <label for="{{ fid }}-option">Filière servie</label>
+        <select id="{{ fid }}-option" name="option">
+          <option value="Repurpose" selected>Repurpose, seconde vie</option>
+          <option value="Remanufacture">Remanufacture, reconditionnement</option>
+          <option value="Reuse">Reuse, réutilisation</option>
+          <option value="Recycle">Recycle, recyclage</option>
+        </select>
+      </div>
+      <div>
+        <label for="{{ fid }}-urgency">Urgence</label>
+        <select id="{{ fid }}-urgency" name="urgency">
+          <option value="urgente">Urgente, +20 pts</option>
+          <option value="normale" selected>Normale, +10 pts</option>
+          <option value="faible">Faible, +5 pts</option>
+        </select>
+      </div>
+    </div>
+    <div class="pair">
+      <div>
+        <label for="{{ fid }}-partner">Partenaire client</label>
+        <input id="{{ fid }}-partner" name="partner" placeholder="AgroÉnergie SAS">
+      </div>
+      <div>
+        <label for="{{ fid }}-soce">SOCE minimum (%)</label>
+        <input id="{{ fid }}-soce" name="min_soce" type="number" min="0" max="100" value="60" inputmode="numeric">
+      </div>
+    </div>
+    <div class="pair">
+      <div>
+        <label for="{{ fid }}-qty">Volume (batteries)</label>
+        <input id="{{ fid }}-qty" name="quantity" type="number" min="1" value="10" inputmode="numeric">
+      </div>
+      <div>
+        <label for="{{ fid }}-loc">Lieu</label>
+        <input id="{{ fid }}-loc" name="location" placeholder="France">
+      </div>
+    </div>
+    <fieldset class="chems">
+      <legend>Chimies acceptées</legend>
+      <label class="radio"><input type="checkbox" name="chemistries" value="NMC 811" checked> NMC 811</label>
+      <label class="radio"><input type="checkbox" name="chemistries" value="LFP" checked> LFP</label>
+    </fieldset>
+    <button class="btn primary block" type="submit" style="margin-top:16px">{{ icon('plus') }} Ajouter au marché</button>
+  </form>
+</details>

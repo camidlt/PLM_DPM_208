@@ -18,10 +18,17 @@
     <dt>Conditions</dt><dd>Chimie {{ dm.chemistries|join(' / ') }}{% if dm.minSoce %} · SOCE au moins {{ dm.minSoce }} %{% endif %}</dd>
     <dt>Volume et urgence</dt><dd>{{ dm.quantity }} batteries · {{ dm.urgency }}</dd>
   </dl>
-  <form method="post" action="{{ url_for('tri_market_toggle', demand_uid=dm.uid) }}" style="margin-top:14px">
-    <input type="hidden" name="back" value="{{ request.url.path }}">
-    <button class="btn {{ 'ghost' if dm.active else 'primary' }} block" type="submit">{{ 'Désactiver' if dm.active else 'Activer' }}</button>
-  </form>
+  <div class="row" style="margin-top:14px; flex-wrap:nowrap">
+    <form method="post" action="{{ url_for('tri_market_toggle', demand_uid=dm.uid) }}" style="flex:1">
+      <input type="hidden" name="back" value="{{ request.url.path }}">
+      <button class="btn {{ 'ghost' if dm.active else 'primary' }} block" type="submit">{{ 'Désactiver' if dm.active else 'Activer' }}</button>
+    </form>
+    <form method="post" action="{{ url_for('tri_market_delete', demand_uid=dm.uid) }}">
+      <input type="hidden" name="back" value="{{ request.url.path }}">
+      <button class="btn ghost" type="submit" aria-label="Supprimer la demande {{ dm.title }}" onclick="return confirm('Supprimer cette demande du marché ?')">{{ icon('trash-2') }}</button>
+    </form>
+  </div>
 </section>
 {% endfor %}
+<section class="panel">{% with back = request.url.path, fid = 'mkt' %}{% include "_demand_form.html" %}{% endwith %}</section>
 {% endblock %}

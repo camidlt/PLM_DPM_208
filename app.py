@@ -470,6 +470,49 @@ async def tri_market_toggle(request: Request, demand_uid: str):
     return RedirectResponse(back if back.startswith("/tri/") else url_for("tri_market"), status_code=303)
 
 
+def _int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+@app.post("/tri/market/add", name="tri_market_add")
+async def tri_market_add(request: Request):
+    """Ajoute une demande du marché au catalogue (défi 3, apport de Camille)."""
+    user = require(request, "centre_tri")
+    form = await request.form()
+    title = (form.get("title") or "").strip()
+    if not title:
+        flash(request, "Le titre de la demande est obligatoire.", "error")
+    else:
+        option = form.get("option") if form.get("option") in decision.OPTIONS else "Repurpose"
+        urgency = form.get("urgency") if form.get("urgency") in decision.URGENCY_BONUS else "normale"
+        repo.add_demand(center_uid=user["actor_uid"], title=title, option=option,
+                        partner=(form.get("partner") or "").strip() or "Partenaire industriel",
+                        chemistries=form.getlist("chemistries") or ["NMC 811", "LFP"],
+                        min_soce=max(0, min(100, _int(form.get("min_soce"), 60))), urgency=urgency,
+                        quantity=max(1, _int(form.get("quantity"), 10)),
+                        location=(form.get("location") or "").strip() or "France")
+        flash(request, f"Demande « {title} » ajoutée au catalogue du marché.")
+    back = form.get("back") or ""
+    return RedirectResponse(back if back.startswith("/tri/") else url_for("tri_market"), status_code=303)
+
+
+@app.post("/tri/market/{demand_uid}/delete", name="tri_market_delete")
+async def tri_market_delete(request: Request, demand_uid: str):
+    require(request, "centre_tri")
+    form = await request.form()
+    demands = {d["uid"]: d for d in repo.list_demands()}
+    if demand_uid in demands:
+        repo.delete_demand(demand_uid)
+        flash(request, f"Demande « {demands[demand_uid]['title']} » retirée du catalogue du marché.")
+    else:
+        flash(request, "Demande introuvable.", "error")
+    back = form.get("back") or ""
+    return RedirectResponse(back if back.startswith("/tri/") else url_for("tri_market"), status_code=303)
+
+
 # --- Défi 1 : télémétrie ESP32 --------------------------------------------------------------
 def device_view():
     nowt = time.time()

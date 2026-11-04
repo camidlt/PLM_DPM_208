@@ -110,3 +110,30 @@ def test_tri_integration_web_et_onglets():
 
     events = [e for e in repo.get_history("BAT-101") if e["type"] == "DECISION_RECORDED"]
     assert len(events) >= 1
+
+    # Ajout d'une nouvelle demande sur le marché
+    res_add = client.post("/tri/market/add", data={
+        "title": "Karts électriques pour circuit de loisir",
+        "option": "Repurpose",
+        "partner": "Karting Circuit SAS",
+        "urgency": "urgente",
+        "min_soce": "65",
+        "quantity": "15",
+        "location": "Paris",
+        "chemistries": ["NMC 811"],
+        "back": "/tri/b/BAT-101?tab=marche#decision"
+    }, follow_redirects=True)
+    assert res_add.status_code == 200
+    demands_after_add = repo.list_demands()
+    added = [d for d in demands_after_add if d["title"] == "Karts électriques pour circuit de loisir"]
+    assert len(added) == 1
+    new_uid = added[0]["uid"]
+    assert added[0]["urgency"] == "urgente"
+
+    # Retrait / suppression de cette demande
+    res_del = client.post(f"/tri/market/{new_uid}/delete", data={
+        "back": "/tri/b/BAT-101?tab=marche#decision"
+    }, follow_redirects=True)
+    assert res_del.status_code == 200
+    demands_after_del = repo.list_demands()
+    assert all(d["uid"] != new_uid for d in demands_after_del)
