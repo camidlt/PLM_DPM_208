@@ -1,21 +1,39 @@
 // BMS émulé sur ESP32 pour le Battery Passport (défi 1).
 //
 // Toutes les 3 s : lit 5 entrées analogiques (une par module), les convertit en résistance
-// interne (mΩ) et envoie un JSON en Wi-Fi au site : POST http://<IP du PC>:8000/api/telemetry.
-// Aucune règle métier ici : le serveur décide de la santé (nominal, surveillance, critique).
+// interne (mΩ) et envoie un JSON au site. Aucune règle métier ici : le serveur décide de la
+// santé (nominal, surveillance, critique).
 //
 // Démo : appuyer sur le bouton BOOT (GPIO 0) déclenche la dérive du module 3, qui monte
 // mesure après mesure jusqu'au défaut (6,8 mΩ). Un nouvel appui le remet à l'état sain.
-// Le même JSON part aussi en Bluetooth série et sur le moniteur série (débogage).
 
 #include <Arduino.h>
+
+#include "secrets.h"  // Wi-Fi, URL du serveur, MQTT (voir secrets.example.h)
+
+/*
+ * MODE DE COMMUNICATION (choix de Théo, branche defi-1) :
+ * 1 -> Bluetooth classique (SerialBT) uniquement, pour le débogage ou une tablette appairée
+ * 2 -> Wi-Fi, HTTP POST sur /api/telemetry (recommandé : le site reçoit directement)
+ * 3 -> Wi-Fi, publication MQTT (le site doit être lancé avec MQTT_HOST)
+ */
+#ifndef COMM_MODE
+#define COMM_MODE 2
+#endif
+
+#if COMM_MODE == 1
 #include <BluetoothSerial.h>
-#include <HTTPClient.h>
-#include <WiFi.h>
-
-#include "secrets.h"  // WIFI_SSID, WIFI_PASS, SERVER_URL, DEVICE_TOKEN (voir secrets.example.h)
-
 BluetoothSerial SerialBT;
+#else
+#include <WiFi.h>
+#if COMM_MODE == 2
+#include <HTTPClient.h>
+#else
+#include <PubSubClient.h>
+WiFiClient netClient;
+PubSubClient mqttClient(netClient);
+#endif
+#endif
 
 const char* BATTERY_ID = "DLR-1985";          // la batterie de Doc dans le passeport
 const char* DEVICE_ID  = "esp32-bms-delorean";
@@ -36,6 +54,7 @@ bool faultOn = false;
 float faultR = R_MIN_HEALTHY;
 unsigned long lastSend = 0;
 
+#if COMM_MODE != 1
 void connectWifi() {
   if (WiFi.status() == WL_CONNECTED) return;
   Serial.printf("Wi-Fi %s ", WIFI_SSID);
@@ -51,6 +70,7 @@ void connectWifi() {
     Serial.println(" échec, nouvel essai au prochain cycle");
   }
 }
+#endif
 
 float readModule(int k) {
   int raw = analogRead(SENSOR_PINS[k]);        // 0 à 4095
@@ -75,7 +95,12 @@ String buildPayload() {
   return json;
 }
 
-void sendHttp(const String& json) {
+void send(const String& json) {
+#if COMM_MODE == 1
+  SerialBT.println(json);
+
+#elif COMM_MODE == 2
+  connectWifi();
   if (WiFi.status() != WL_CONNECTED) return;
   HTTPClient http;
   http.begin(SERVER_URL);
@@ -84,8 +109,23 @@ void sendHttp(const String& json) {
   http.addHeader("X-Device-Id", DEVICE_ID);
   if (strlen(DEVICE_TOKEN) > 0) http.addHeader("X-Device-Token", DEVICE_TOKEN);
   int code = http.POST(json);
-  Serial.printf("POST %s -> %d\n", SERVER_URL, code);
+  if (code > 0) Serial.printf("POST %s -> %d\n", SERVER_URL, code);
+  else Serial.printf("POST erreur : %s\n", http.errorToString(code).c_str());
   http.end();
+
+#else
+  connectWifi();
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (!mqttClient.connected()) {
+    Serial.print("MQTT ");
+    if (mqttClient.connect(DEVICE_ID)) Serial.println("connecté");
+    else { Serial.printf("échec, rc=%d\n", mqttClient.state()); return; }
+  }
+  // même sujet que celui écouté par le site : <TOPIC_PREFIX>/battery/+/telemetry
+  String topic = String(TOPIC_PREFIX) + "/battery/" + BATTERY_ID + "/telemetry";
+  mqttClient.publish(topic.c_str(), json.c_str());
+  Serial.printf("MQTT publié sur %s\n", topic.c_str());
+#endif
 }
 
 void setup() {
@@ -93,11 +133,22 @@ void setup() {
   pinMode(BOOT_BUTTON, INPUT_PULLUP);
   pinMode(LED_PIN, OUTPUT);
   analogReadResolution(12);
+#if COMM_MODE == 1
   SerialBT.begin("BMS-DeLorean-ESP32");
+  Serial.println("Bluetooth démarré, prêt à appairer");
+#else
   connectWifi();
+#if COMM_MODE == 3
+  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+  mqttClient.setBufferSize(512);
+#endif
+#endif
 }
 
 void loop() {
+#if COMM_MODE == 3
+  mqttClient.loop();
+#endif
   // bouton BOOT : bascule la dérive du module 3 (anti-rebond simple)
   static bool lastBtn = HIGH;
   bool btn = digitalRead(BOOT_BUTTON);
@@ -111,11 +162,9 @@ void loop() {
   if (millis() - lastSend < PERIOD_MS) return;
   lastSend = millis();
 
-  connectWifi();
   String json = buildPayload();
   digitalWrite(LED_PIN, HIGH);
-  sendHttp(json);
-  SerialBT.println(json);
+  send(json);
   Serial.println(json);
   digitalWrite(LED_PIN, LOW);
 }
