@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}{{ p.battery.batteryId }} · Centre de tri{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('tri_home') }}">← Scanner une autre batterie</a></p>
+{{ ui.passport_header(p) }}
+
+{% set t = p.transfer %}
+{% if p.battery.status == 'Waste' %}
+  <div class="status-check ok card">
+    <div>Statut du Battery Passport</div>
+    <div class="big">✅ WASTE</div>
+    <div>Le statut est à jour : la batterie peut être prise en charge.</div>
+  </div>
+{% else %}
+  <div class="status-check bad card">
+    <div>Statut du Battery Passport</div>
+    <div class="big">⛔ {{ p.battery.status|upper }}</div>
+    <div>Statut NON à jour : ne pas prendre en charge, contacter le propriétaire.</div>
+  </div>
+{% endif %}
+
+<div class="card">
+  <h2>Réception</h2>
+  {% if t and t.state == 'RECEIVED' %}
+    <div class="alert ok"><span class="icon">📦</span><div><strong>Réceptionnée</strong>
+      par {{ t.toName }} le {{ t.receivedAt|replace('T', ' ') }} (ordre {{ t.uid }})</div></div>
+  {% elif t and t.state == 'ORDERED' and t.toUid == user.actor_uid and p.battery.status == 'Waste' %}
+    <p class="small">Ordre de transfert <strong>{{ t.uid }}</strong> depuis {{ t.fromName or '—' }}.</p>
+    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}">
+      <button class="btn accent block" type="submit">📦 Confirmer la réception</button>
+    </form>
+  {% elif t and t.state == 'ORDERED' %}
+    <div class="alert warn"><span class="icon">↪️</span><div>Cette batterie est attendue par
+      <strong>{{ t.toName }}</strong>, pas par votre centre.</div></div>
+  {% else %}
+    <div class="alert warn"><span class="icon">❓</span><div>Aucun ordre de transfert pour cette batterie.</div></div>
+  {% endif %}
+</div>
+
+<div class="card" style="border-style:dashed">
+  <h2>Aide à la décision (défi 3)</h2>
+  <p class="small muted" style="margin:0">Emplacement réservé : recommandation Reuse / Remanufacture /
+    Repurpose / Recycle. Les données nécessaires sont disponibles via <code>/api/battery/{{ p.battery.batteryId }}</code>.</p>
+</div>
+
+{{ ui.performance(p) }}
+{{ ui.modules(p) }}
+{{ ui.composition(p) }}
+{{ ui.sustainability(p) }}
+{{ ui.identification(p) }}
+{{ ui.history_card(history) }}
+{% endblock %}

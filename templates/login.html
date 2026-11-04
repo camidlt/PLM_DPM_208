@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Connexion · Battery Passport{% endblock %}
+{% block hero %}
+<div class="login-hero">
+  <div class="small" style="letter-spacing:.2em;opacity:.8">BATTERY TO THE FUTURE</div>
+  <h1>Battery Passport</h1>
+  <p style="opacity:.85;margin:0">Traçabilité des batteries, du garage au centre de tri</p>
+</div>
+{% endblock %}
+{% block content %}
+<div class="card login-card">
+  <h2>Connexion</h2>
+  <form method="post">
+    <label for="username">Identifiant</label>
+    <input id="username" name="username" autocomplete="username" autocapitalize="none" required>
+    <label for="password">Mot de passe</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button class="btn accent block" style="margin-top:14px" type="submit">Se connecter</button>
+  </form>
+</div>
+<div class="card login-card" style="margin-top:0">
+  <h3>Comptes de test</h3>
+  <table class="accounts">
+    <tr><th>Rôle</th><th>Identifiant</th><th>Mot de passe</th></tr>
+    {% for name, a in accounts.items() %}
+      <tr><td style="font-family:inherit">{{ role_label[a.role] }}</td><td>{{ name }}</td><td>{{ a.password }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

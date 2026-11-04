@@ -1,0 +1,227 @@
+"""Accès Neo4j : mêmes méthodes que MemoryRepo, en Cypher.
+
+Si le dump fourni par les organisateurs utilise d'autres noms de propriétés ou
+de relations, c'est ici (et seulement ici) qu'il faut adapter les requêtes.
+"""
+import uuid
+from datetime import datetime
+
+from neo4j import GraphDatabase
+
+from . import config, seed_data
+
+
+def now():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def new_uid(prefix):
+    return f"{prefix}-{uuid.uuid4().hex[:8].upper()}"
+
+
+PASSPORT_QUERY = """
+MATCH (b:BatteryInstance {batteryId: $id})
+OPTIONAL MATCH (m:Model)-[:HAS_BATTERY_INSTANCE]->(b)
+OPTIONAL MATCH (t:Type)-[:HAS_MODEL]->(m)
+OPTIONAL MATCH (eo:EconomicOperator)-[:BUILD]->(b)
+OPTIONAL MATCH (m)-[:HAS_COMPOSITION]->(c:Composition)
+OPTIONAL MATCH (c)-[:HAS_CATHODE]->(ca)
+OPTIONAL MATCH (c)-[:HAS_ANODE]->(an)
+OPTIONAL MATCH (c)-[:HAS_ELECTROLYTE]->(el)
+OPTIONAL MATCH (m)-[:HAS_STATIC_PERFORMANCE]->(sp)
+OPTIONAL MATCH (m)-[:HAS_STATIC_DURABILITY]->(sd)
+OPTIONAL MATCH (m)-[:HAS_CARBON_FOOTPRINT]->(cf)
+OPTIONAL MATCH (m)-[:HAS_CERTIFICATION]->(ce)
+OPTIONAL MATCH (m)-[:HAS_CIRCULARITY]->(ci)
+OPTIONAL MATCH (b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp)
+OPTIONAL MATCH (b)-[:HAS_DYNAMIC_DURABILITY]->(dd)
+OPTIONAL MATCH (b)-[:LOCATED_AT]->(loc:Actor)
+RETURN b{.*} AS battery, m{.*} AS model, t{.*} AS type, eo{.*} AS operator,
+       c{.*} AS composition, ca{.*} AS cathode, an{.*} AS anode, el{.*} AS electrolyte,
+       sp{.*} AS static_performance, sd{.*} AS static_durability, cf{.*} AS carbon_footprint,
+       ce{.*} AS certification, ci{.*} AS circularity, dp{.*} AS dynamic_performance,
+       dd{.*} AS dynamic_durability, loc{.*} AS location
+LIMIT 1
+"""
+
+NOTIF_RETURN = """
+MATCH (n)-[:ABOUT]->(b:BatteryInstance)
+MATCH (n)-[:ADDRESSED_TO]->(eo:EconomicOperator)
+OPTIONAL MATCH (s:Actor)-[:SENT]->(n)
+RETURN n{.*, batteryId: b.batteryId, senderName: s.name, operatorUid: eo.uid} AS n
+"""
+
+EVENT_CREATE = """
+WITH b, actor
+CREATE (e:Event {uid: $evt_uid, type: $etype, at: $at, actorName: actor.name, details: $details})
+CREATE (b)-[:HAS_EVENT]->(e)
+CREATE (actor)-[:PERFORMED]->(e)
+"""
+
+
+class Neo4jRepo:
+    backend = "neo4j"
+
+    def __init__(self, uri=None, user=None, password=None, database=None):
+        self.driver = GraphDatabase.driver(uri or config.NEO4J_URI,
+                                           auth=(user or config.NEO4J_USER,
+                                                 password or config.NEO4J_PASSWORD))
+        self.database = database or config.NEO4J_DATABASE
+        self.driver.verify_connectivity()
+
+    def _read(self, query, **params):
+        records, _, _ = self.driver.execute_query(query, params, database_=self.database,
+                                                  routing_="r")
+        return records
+
+    def _write(self, query, **params):
+        records, _, _ = self.driver.execute_query(query, params, database_=self.database)
+        return records
+
+    # --- initialisation -------------------------------------------------------
+    def reset(self):
+        """Efface les nœuds de démo puis recharge le jeu de données."""
+        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event DETACH DELETE n")
+        uids = [uid for _, uid, _ in seed_data.NODES]
+        self._write("MATCH (n) WHERE n.uid IN $uids DETACH DELETE n", uids=uids)
+        for stmt in seed_data.cypher_statements():
+            self._write(stmt)
+
+    # --- lectures ----------------------------------------------------------------
+    def list_batteries(self):
+        return [r.data() for r in self._read("""
+            MATCH (b:BatteryInstance)
+            OPTIONAL MATCH (m:Model)-[:HAS_BATTERY_INSTANCE]->(b)
+            OPTIONAL MATCH (b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp)
+            OPTIONAL MATCH (b)-[:LOCATED_AT]->(l:Actor)
+            RETURN b.batteryId AS batteryId, b.status AS status, m.name AS model,
+                   dp.soh AS soh, l.name AS location
+            ORDER BY batteryId""")]
+
+    def get_passport(self, battery_id):
+        rows = self._read(PASSPORT_QUERY, id=battery_id)
+        if not rows:
+            return None
+        p = rows[0].data()
+        p["dynamic_performance"] = p["dynamic_performance"] or {}
+        p["dynamic_durability"] = p["dynamic_durability"] or {}
+        p["modules"] = [r["m"] for r in self._read(
+            "MATCH (:BatteryInstance {batteryId: $id})-[:HAS_MODULE]->(m:Module) "
+            "RETURN m{.*} AS m ORDER BY m.index", id=battery_id)]
+        pending = self._read(
+            "MATCH (n:Notification {state: 'PENDING'})-[:ABOUT]->(:BatteryInstance {batteryId: $id}) "
+            "WITH n LIMIT 1" + NOTIF_RETURN, id=battery_id)
+        p["pending_request"] = pending[0]["n"] if pending else None
+        transfer = self._read("""
+            MATCH (t:TransferOrder)-[:FOR]->(:BatteryInstance {batteryId: $id})
+            MATCH (t)-[:TO]->(d:Actor)
+            OPTIONAL MATCH (t)-[:FROM]->(f:Actor)
+            RETURN t{.*, toUid: d.uid, toName: d.name, toAgreed: d.agreed, fromName: f.name} AS t
+            ORDER BY t.createdAt DESC LIMIT 1""", id=battery_id)
+        p["transfer"] = transfer[0]["t"] if transfer else None
+        return p
+
+    def get_history(self, battery_id):
+        return [r["e"] for r in self._read(
+            "MATCH (:BatteryInstance {batteryId: $id})-[:HAS_EVENT]->(e:Event) "
+            "RETURN e{.*} AS e ORDER BY e.at DESC", id=battery_id)]
+
+    def get_notification(self, notif_uid):
+        rows = self._read("MATCH (n:Notification {uid: $uid})" + NOTIF_RETURN, uid=notif_uid)
+        return rows[0]["n"] if rows else None
+
+    def list_notifications(self, operator_uid):
+        return [r["n"] for r in self._read(
+            "MATCH (n:Notification)-[:ADDRESSED_TO]->(:EconomicOperator {uid: $op})"
+            + NOTIF_RETURN + " ORDER BY n.createdAt DESC", op=operator_uid)]
+
+    def list_actors(self, role):
+        return [r["a"] for r in self._read(
+            "MATCH (a:Actor {role: $role}) RETURN a{.*} AS a ORDER BY a.name", role=role)]
+
+    def list_transfers_to(self, center_uid):
+        return [r["t"] for r in self._read("""
+            MATCH (t:TransferOrder)-[:TO]->(:Actor {uid: $uid})
+            MATCH (t)-[:FOR]->(b:BatteryInstance)
+            RETURN t{.*, batteryId: b.batteryId, status: b.status} AS t
+            ORDER BY t.createdAt DESC""", uid=center_uid)]
+
+    # --- écritures --------------------------------------------------------------
+    def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,
+                              requested_status, reason, diagnostic):
+        uid = new_uid("NOTIF")
+        self._write("""
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (actor:Actor {uid: $actor_uid})
+            MATCH (eo:EconomicOperator {uid: $op_uid})
+            CREATE (n:Notification {uid: $uid, type: 'STATUS_CHANGE_REQUEST',
+                    fromStatus: $from_status, requestedStatus: $requested, reason: $reason,
+                    diagnostic: $diagnostic, state: 'PENDING', createdAt: $at})
+            CREATE (actor)-[:SENT]->(n)
+            CREATE (n)-[:ABOUT]->(b)
+            CREATE (n)-[:ADDRESSED_TO]->(eo)
+            """ + EVENT_CREATE,
+            bid=battery_id, actor_uid=actor_uid, op_uid=operator_uid, uid=uid,
+            from_status=from_status, requested=requested_status, reason=reason,
+            diagnostic=diagnostic, at=now(), evt_uid=new_uid("EVT"), etype="FAULT_REPORTED",
+            details=f"Hors d'usage signalé : {reason} | {diagnostic}")
+        return uid
+
+    def apply_approval(self, notif_uid, battery_id, owner_uid, new_status, from_status,
+                       destination_uid, comment):
+        order_uid = new_uid("TO")
+        dest_name = self._read("MATCH (d:Actor {uid: $uid}) RETURN d.name AS name",
+                               uid=destination_uid)[0]["name"]
+        at = now()
+        self._write("""
+            MATCH (n:Notification {uid: $nuid})
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (actor:Actor {uid: $owner_uid})
+            MATCH (dest:Actor {uid: $dest_uid})
+            OPTIONAL MATCH (b)-[:LOCATED_AT]->(loc:Actor)
+            SET n.state = 'APPROVED', n.decidedAt = $at, n.decidedBy = actor.name,
+                n.comment = $comment, b.status = $new_status
+            CREATE (t:TransferOrder {uid: $order_uid, state: 'ORDERED', createdAt: $at})
+            CREATE (t)-[:FOR]->(b)
+            CREATE (t)-[:TO]->(dest)
+            CREATE (n)-[:TRIGGERED]->(t)
+            FOREACH (_ IN CASE WHEN loc IS NULL THEN [] ELSE [1] END | CREATE (t)-[:FROM]->(loc))
+            WITH b, actor
+            CREATE (e1:Event {uid: $evt1, type: 'STATUS_CHANGED', at: $at,
+                              actorName: actor.name, details: $details1})
+            CREATE (e2:Event {uid: $evt2, type: 'TRANSFER_ORDERED', at: $at,
+                              actorName: actor.name, details: $details2})
+            CREATE (b)-[:HAS_EVENT]->(e1), (b)-[:HAS_EVENT]->(e2)
+            CREATE (actor)-[:PERFORMED]->(e1), (actor)-[:PERFORMED]->(e2)
+            """,
+            nuid=notif_uid, bid=battery_id, owner_uid=owner_uid, dest_uid=destination_uid,
+            at=at, comment=comment, new_status=new_status, order_uid=order_uid,
+            evt1=new_uid("EVT"), evt2=new_uid("EVT"),
+            details1=f"{from_status} → {new_status}",
+            details2=f"Transfert vers {dest_name} ({order_uid})")
+
+    def apply_rejection(self, notif_uid, battery_id, owner_uid, comment):
+        self._write("""
+            MATCH (n:Notification {uid: $nuid})
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (actor:Actor {uid: $owner_uid})
+            SET n.state = 'REJECTED', n.decidedAt = $at, n.decidedBy = actor.name, n.comment = $comment
+            """ + EVENT_CREATE,
+            nuid=notif_uid, bid=battery_id, owner_uid=owner_uid, at=now(), comment=comment,
+            evt_uid=new_uid("EVT"), etype="REQUEST_REJECTED", details=f"Demande refusée : {comment}")
+
+    def apply_reception(self, order_uid, battery_id, center_uid):
+        self._write("""
+            MATCH (t:TransferOrder {uid: $order_uid})
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (actor:Actor {uid: $center_uid})
+            SET t.state = 'RECEIVED', t.receivedAt = $at
+            WITH t, b, actor
+            OPTIONAL MATCH (b)-[old:LOCATED_AT]->()
+            DELETE old
+            WITH DISTINCT b, actor
+            CREATE (b)-[:LOCATED_AT]->(actor)
+            """ + EVENT_CREATE,
+            order_uid=order_uid, bid=battery_id, center_uid=center_uid, at=now(),
+            evt_uid=new_uid("EVT"), etype="RECEIVED",
+            details=f"Batterie réceptionnée (ordre {order_uid})")

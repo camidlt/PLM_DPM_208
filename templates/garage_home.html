@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}Garagiste · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Bonjour 👋</h1>
+<p class="muted">Scannez le QR code de la batterie du véhicule pour consulter son passeport.</p>
+{{ ui.scan_box(batteries) }}
+{% endblock %}
+{% block scripts %}{% include "_scan_scripts.html" %}{% endblock %}

@@ -1,0 +1,22 @@
+<div class="grid two">
+  <form method="post" action="{{ url_for('owner_approve', notif_uid=n.uid) }}"
+        onsubmit="return confirm('Passer {{ n.batteryId }} en « Waste » et créer l\'ordre de transfert ?')">
+    <input type="hidden" name="back" value="{{ request.path }}">
+    <label>Centre de tri de destination</label>
+    <select name="destination" required>
+      {% for c in centers %}
+        <option value="{{ c.uid }}" {% if not c.agreed %}disabled{% endif %}>
+          {{ c.name }} ({{ c.city }}) {{ '· agréé ' ~ c.agreementNumber if c.agreed else '· NON agréé' }}</option>
+      {% endfor %}
+    </select>
+    <label>Commentaire (optionnel)</label>
+    <input name="comment" placeholder="ex. enlèvement sous 48 h">
+    <button class="btn accent block" style="margin-top:10px" type="submit">✅ Valider : Original → Waste + transfert</button>
+  </form>
+  <form method="post" action="{{ url_for('owner_reject', notif_uid=n.uid) }}">
+    <input type="hidden" name="back" value="{{ request.path }}">
+    <label>Motif du refus</label>
+    <input name="comment" placeholder="ex. batterie encore sous garantie, à renvoyer à l'usine" required>
+    <button class="btn ghost block" style="margin-top:10px" type="submit">Refuser la demande</button>
+  </form>
+</div>

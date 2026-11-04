@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}{% if pending %}({{ pending|length }}) {% endif %}Propriétaire · Battery Passport{% endblock %}
+{% block content %}
+<h1>Espace propriétaire du Battery Passport</h1>
+<p class="muted">Demandes des garages, statuts et transferts des batteries de votre flotte.</p>
+
+<div class="card" id="inbox">
+  <h2>🔔 Demandes en attente ({{ pending|length }})</h2>
+  {% for n in pending %}
+    <div class="card" style="background:var(--bg)">
+      <div class="row" style="justify-content:space-between">
+        <div>
+          <strong><a href="{{ url_for('owner_battery', battery_id=n.batteryId) }}">{{ n.batteryId }}</a></strong>
+          · {{ n.senderName }} · <span class="muted small">{{ n.createdAt|replace('T', ' ') }}</span>
+        </div>
+        <div>{{ ui.status_badge(n.fromStatus) }} → {{ ui.status_badge(n.requestedStatus) }}</div>
+      </div>
+      <p style="margin:.5rem 0"><strong>Motif :</strong> {{ n.reason }}<br>
+        <span class="small muted">Diagnostic : {{ n.diagnostic }}</span></p>
+      {% include "_decision_form.html" %}
+    </div>
+  {% else %}
+    <p class="muted">Aucune demande en attente.</p>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Flotte de batteries</h2>
+  <div class="table-wrap"><table>
+    <tr><th>Batterie</th><th>Modèle</th><th>SOH</th><th>Statut</th><th>Localisation</th></tr>
+    {% for b in batteries %}
+    <tr><td><a href="{{ url_for('owner_battery', battery_id=b.batteryId) }}">{{ b.batteryId }}</a></td>
+      <td>{{ b.model }}</td><td>{{ b.soh }} %</td><td>{{ ui.status_badge(b.status) }}</td><td>{{ b.location }}</td></tr>
+    {% endfor %}
+  </table></div>
+</div>
+
+<div class="card">
+  <h2>Demandes traitées</h2>
+  {% if processed %}
+  <div class="table-wrap"><table>
+    <tr><th>Date</th><th>Batterie</th><th>Garage</th><th>Décision</th><th>Commentaire</th></tr>
+    {% for n in processed %}
+    <tr><td>{{ n.decidedAt|replace('T', ' ') }}</td><td>{{ n.batteryId }}</td><td>{{ n.senderName }}</td>
+      <td>{{ ui.status_badge(n.state) }}</td><td>{{ n.comment }}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Aucune.</p>{% endif %}
+</div>
+{% endblock %}

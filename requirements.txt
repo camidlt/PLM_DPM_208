@@ -1,0 +1,4 @@
+flask>=3.0
+neo4j>=5.14
+qrcode[pil]>=7.4
+pytest>=8

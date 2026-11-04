@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}Centre de tri · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Réception des batteries</h1>
+{{ ui.scan_box(batteries, 'Scanner une batterie reçue') }}
+<div class="card">
+  <h2>Transferts attendus</h2>
+  {% for t in transfers %}
+    <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:.5rem 0">
+      <a href="{{ url_for('tri_battery', battery_id=t.batteryId) }}"><strong>{{ t.batteryId }}</strong></a>
+      <span>{{ ui.status_badge(t.state) }}</span>
+      <span class="small muted" style="width:100%">Ordre {{ t.uid }} · {{ t.createdAt|replace('T', ' ') }}</span>
+    </div>
+  {% else %}<p class="muted">Aucun transfert vers votre centre pour le moment.</p>{% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}{% include "_scan_scripts.html" %}{% endblock %}
