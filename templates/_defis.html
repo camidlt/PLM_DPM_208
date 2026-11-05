@@ -30,9 +30,9 @@
           <text class="threshold-label" x="{{ chart.left + 4 }}" y="{{ chart.threshold_y - 5 }}">seuil max {{ chart.threshold }} mΩ</text>
         {% endif %}
         {% for l in chart.lines %}
-          <polyline class="series {{ 'hot' if l.hot }}" points="{{ l.points }}"/>
-          <circle class="series-end {{ 'hot' if l.hot }}" cx="{{ l.end_x }}" cy="{{ l.end_y }}" r="3"/>
-          <text class="series-label {{ 'hot' if l.hot }}" x="{{ l.end_x + 7 }}" y="{{ l.label_y + 4 }}">M{{ l.index }}</text>
+          <polyline class="series s-{{ l.index }} {{ 'hot' if l.hot }}" fill="none" stroke-width="2" points="{{ l.points }}"/>
+          <circle class="series-end s-{{ l.index }} {{ 'hot' if l.hot }}" cx="{{ l.end_x }}" cy="{{ l.end_y }}" r="3.5"/>
+          <text class="series-label s-{{ l.index }} {{ 'hot' if l.hot }}" x="{{ l.end_x + 7 }}" y="{{ l.label_y }}">M{{ l.index }}</text>
         {% endfor %}
         <text class="tick" x="{{ chart.left }}" y="{{ chart.height - 4 }}">{{ chart.first_at[:10] }}</text>
         <text class="tick" x="{{ chart.right }}" y="{{ chart.height - 4 }}" text-anchor="end">{{ chart.last_at[:10] }}</text>

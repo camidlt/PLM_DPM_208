@@ -93,9 +93,17 @@ h3 { font-size: 1rem; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
 label { display: block; font-weight: 600; font-size: .9rem; margin: .6rem 0 .25rem; }
-input, select, textarea { width: 100%; font: inherit; padding: .65rem .75rem; border-radius: 10px;
+input:not([type="checkbox"]):not([type="radio"]), select, textarea { width: 100%; font: inherit; padding: .65rem .75rem; border-radius: 10px;
   border: 1px solid var(--line); background: #fff; color: var(--ink); min-height: 44px; }
+input[type="checkbox"], input[type="radio"] {
+  width: 18px; height: 18px; min-height: 18px; accent-color: var(--accent); cursor: pointer;
+  vertical-align: middle;
+}
 textarea { min-height: 80px; resize: vertical; }
+
+.checks { display: grid; gap: 8px; margin: 10px 0; }
+.checks label { display: flex; align-items: center; gap: 10px; font-weight: normal; margin: 0; cursor: pointer; }
+.checks input[type="checkbox"] { flex: none; width: 18px; height: 18px; min-height: 18px; }
 
 /* --- passeport --- */
 .passport-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
@@ -346,3 +354,139 @@ dialog.doc-modal::backdrop {
 #decision { scroll-margin-top: 64px; }
 .tabs { margin: 18px 0 10px; padding: 0; }
 .tabs button { flex: 1 0 auto; padding: .55rem .25rem; font-size: .84rem; }
+
+
+/* --- Toggle switch modern (type selection marche des ventes) --- */
+.toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 14px 0 10px;
+}
+.switch-control {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex: none;
+  cursor: pointer;
+  margin: 0;
+}
+.switch-control input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.switch-track {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #cbd5e1;
+  border-radius: 999px;
+  transition: background-color .2s ease;
+}
+.switch-thumb {
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  top: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  transition: transform .2s ease;
+}
+.switch-control input:checked + .switch-track {
+  background-color: var(--ok, #16a34a);
+}
+.switch-control input:checked + .switch-track .switch-thumb {
+  transform: translateX(22px);
+}
+
+/* --- Telemetrie BMS : Courbe SVG --- */
+.chart {
+  margin: 14px 0 6px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 12px 10px;
+}
+.chart svg {
+  width: 100%;
+  height: auto;
+  max-height: 230px;
+  overflow: visible;
+  display: block;
+}
+.chart .grid {
+  stroke: #e2e8f0;
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.chart .threshold {
+  stroke: #ef4444;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.chart .threshold-label {
+  fill: #dc2626;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.chart .tick {
+  fill: var(--muted, #64748b);
+  font-size: 10px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+.chart polyline.series {
+  fill: none !important;
+  stroke: #94a3b8;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chart polyline.series.hot {
+  stroke: #dc2626 !important;
+  stroke-width: 2.5;
+}
+.chart circle.series-end {
+  fill: #94a3b8;
+}
+.chart circle.series-end.hot {
+  fill: #dc2626;
+}
+.chart .series-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  fill: var(--muted, #64748b);
+  font-family: system-ui, -apple-system, sans-serif;
+  dominant-baseline: central;
+}
+.chart .series-label.hot {
+  font-size: 11.5px;
+  font-weight: 800;
+  fill: #dc2626;
+}
+
+/* Couleurs distinctes par module */
+.chart polyline.series.s-1 { stroke: #3b82f6; }
+.chart polyline.series.s-2 { stroke: #10b981; }
+.chart polyline.series.s-3 { stroke: #dc2626; stroke-width: 2.5; }
+.chart polyline.series.s-4 { stroke: #8b5cf6; }
+.chart polyline.series.s-5 { stroke: #06b6d4; }
+.chart circle.series-end.s-1 { fill: #3b82f6; }
+.chart circle.series-end.s-2 { fill: #10b981; }
+.chart circle.series-end.s-3 { fill: #dc2626; }
+.chart circle.series-end.s-4 { fill: #8b5cf6; }
+.chart circle.series-end.s-5 { fill: #06b6d4; }
+.chart .series-label.s-1 { fill: #2563eb; }
+.chart .series-label.s-2 { fill: #059669; }
+.chart .series-label.s-3 { fill: #dc2626; }
+.chart .series-label.s-4 { fill: #7c3aed; }
+.chart .series-label.s-5 { fill: #0891b2; }

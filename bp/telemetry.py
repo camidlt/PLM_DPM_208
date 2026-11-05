@@ -143,15 +143,16 @@ def resistance_chart(readings, modules, width=460, height=190, last=12):
         lines.append(dict(index=idx, hot=hot, last=pts[-1][1],
                           points=" ".join(f"{x(k)},{y(v)}" for k, v in pts),
                           end_x=x(pts[-1][0]), end_y=y(pts[-1][1])))
-    # Étiquettes « M1…M5 » en bout de ligne : on les écarte pour qu'elles ne se chevauchent pas
-    gap, prev = 11, None
+    # Étiquettes « M1…M5 » en bout de ligne : espacement propre pour éviter tout chevauchement
+    gap, prev = 13, None
     for line in sorted(lines, key=lambda l: l["end_y"]):
         line["label_y"] = line["end_y"] if prev is None else max(line["end_y"], prev + gap)
         prev = line["label_y"]
     overflow = prev - (height - pad_b) if prev is not None else 0
     if overflow > 0:
         for line in lines:
-            line["label_y"] -= overflow
+            if line["end_y"] > pad_t + h / 2:
+                line["label_y"] -= overflow
     step = 1 if top <= 5 else (2 if top <= 10 else 5)
     ticks = [dict(v=v, y=y(v)) for v in range(0, int(top) + 1, step)]
     return dict(width=width, height=height, lines=lines, ticks=ticks,

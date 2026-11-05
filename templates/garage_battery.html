@@ -48,8 +48,18 @@
           </select>
           <label for="comment">Commentaire</label>
           <textarea id="comment" name="comment" placeholder="Constat, mesures, réparation impossible…">{% if alerts %}Module {{ alerts[0].index }} hors tolérance, non réparable sur site.{% endif %}</textarea>
-          <label><input type="checkbox" name="auto_logistics" value="1" checked> Planifier automatiquement la collecte (mode logistique magasin)</label>
-          <div class="grid two" style="margin-top:8px">
+          <div class="toggle-card">
+            <div>
+              <div style="font-weight:700; font-size:.92rem">Planifier automatiquement la collecte</div>
+              <div class="small muted">Mode logistique magasin (tournée groupée programmée)</div>
+            </div>
+            <label class="switch-control" title="Activer / désactiver la planification automatique">
+              <input type="checkbox" id="auto_logistics" name="auto_logistics" value="1" checked
+                     onchange="document.getElementById('auto_schedule_fields').style.display = this.checked ? 'grid' : 'none'">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div id="auto_schedule_fields" class="grid two" style="margin-top:8px">
             <div>
               <label for="pickup_date">Date d'enlèvement auto</label>
               <input id="pickup_date" type="date" name="pickup_date" value="{{ today }}" min="{{ today }}">
