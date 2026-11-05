@@ -105,3 +105,30 @@ def test_api_historique_et_courbe(client):
     assert hot == [3] and chart["threshold"] == 2.0
     labels = sorted(line["label_y"] for line in chart["lines"])
     assert all(b - a >= 11 for a, b in zip(labels, labels[1:]))
+
+
+def test_esp32_trame_et_calcul_ohms_law(client):
+    h = {"X-Device-Id": "esp32-bms-delorean"}
+    payload = {
+        "battery_id": "dlr-1985",
+        "modules": [
+            {"id": 1, "r_mohm": 1.25, "t": 25.0},
+            {"id": 2, "v_ocv": 3.7, "v": 3.6832, "i": 12.0},
+            {"id": 3, "r_mohm": 1.1},
+            {"id": 4, "r_mohm": 1.2},
+            {"id": 5, "r_mohm": 1.3},
+        ]
+    }
+    r = client.post("/api/telemetry", json=payload, headers=h)
+    assert r.status_code == 201
+    p = repo.get_passport("BAT-DOC-001")
+    assert p["modules"][0]["internalResistance_mOhm"] == 1.25
+    assert p["modules"][1]["internalResistance_mOhm"] == pytest.approx(1.4, abs=0.01)
+
+
+def test_alias_dlr_1985_scan_et_redirection(client):
+    client.post("/login", data={"username": "garagiste", "password": "garage123"})
+    r = client.get("/b/DLR-1985")
+    assert r.status_code == 302 and "BAT-DOC-001" in r.headers["Location"]
+    r2 = client.get("/scan?code=DLR-1985")
+    assert r2.status_code == 302 and "BAT-DOC-001" in r2.headers["Location"]

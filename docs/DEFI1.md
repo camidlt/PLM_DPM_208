@@ -1,5 +1,8 @@
 # Défi #1 – Télémétrie & données dynamiques côté garagiste
 
+> Note : document de la première version FastAPI (seuil 25 mΩ, champs `position`, `lastResistance`). Le site unifié applique les mêmes règles avec le jeu de données de `bp/seed_data.py` (FC-85 : max 2,0 mΩ) ; voir le README, section 2.
+
+
 ## 1. Schéma de données (extension du modèle fourni)
 
 Les nœuds ajoutés au modèle Capgemini sont marqués ★.

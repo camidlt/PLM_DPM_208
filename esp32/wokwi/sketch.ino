@@ -1,7 +1,8 @@
 /*
-  BMS émulé – Battery Passport (Hackathon ESILV x Capgemini, Défi #1)
+  BMS émulé, Battery Passport (Hackathon ESILV x Capgemini, Défi 1)
   ESP32 sur Wokwi : mesure (simulée) tension + courant des 5 modules,
   calcule la résistance interne R = ΔV / I et publie en MQTT toutes les 2 s.
+  Wokwi ne voit pas le PC local : lancer le site avec MQTT_HOST=broker.hivemq.com.
 
   Potentiomètre = dégradation du module 3 (tourner -> R monte -> alerte).
   LED rouge = au moins un module au-dessus du max constructeur.
@@ -21,13 +22,13 @@ const char* BATTERY_ID = "DLR-1985";
 
 const int   NB_MODULES = 5;
 const int   FAULTY     = 3;       // module défectueux
-const float R_MAX      = 25.0;    // mΩ, max constructeur (pour la LED locale)
+const float R_MAX      = 2.0;     // mΩ, max constructeur du FC-85 (pour la LED locale)
 const float I_LOAD     = 12.0;    // A
 const float V_OCV      = 3.70;    // V, tension à vide d'un module
 const int   POT_PIN    = 34;
 const int   LED_PIN    = 2;
 
-float baseR[NB_MODULES] = {7.8, 8.1, 8.0, 7.9, 8.3};  // mΩ, modules sains
+float baseR[NB_MODULES] = {1.2, 1.3, 1.1, 1.2, 1.4};  // mΩ, modules sains (FC-85 neuf : 1,0)
 
 WiFiClient net;
 PubSubClient mqtt(net);
@@ -73,19 +74,19 @@ void loop() {
   bool critical = false;
 
   for (int k = 0; k < NB_MODULES; k++) {
-    float r = baseR[k] + random(-30, 30) / 100.0;
-    if (k + 1 == FAULTY) r += knob * 55.0;            // dégradation pilotée par le potentiomètre
+    float r = baseR[k] + random(-5, 5) / 100.0;
+    if (k + 1 == FAULTY) r += knob * 6.0;            // dégradation pilotée par le potentiomètre
     float i     = I_LOAD + random(-20, 20) / 100.0;   // "capteur" de courant
     float vLoad = V_OCV - i * r / 1000.0;             // "capteur" de tension sous charge
     float rCalc = (V_OCV - vLoad) / i * 1000.0;       // R = ΔV / I  (mΩ)
-    float t     = 25.0 + (rCalc - 8.0) * 0.35 + random(-5, 5) / 10.0;
+    float t     = 25.0 + (rCalc - 1.2) * 2.0 + random(-5, 5) / 10.0;
 
     JsonObject m = mods.add<JsonObject>();
     m["id"]     = k + 1;
     m["v_ocv"]  = V_OCV;
     m["v"]      = round(vLoad * 10000) / 10000.0;
     m["i"]      = round(i * 100) / 100.0;
-    m["r_mohm"] = round(rCalc * 10) / 10.0;
+    m["r_mohm"] = round(rCalc * 100) / 100.0;
     m["t"]      = round(t * 10) / 10.0;
     if (rCalc > R_MAX) critical = true;
   }
