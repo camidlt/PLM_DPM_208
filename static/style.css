@@ -948,3 +948,38 @@ dialog.doc-modal::backdrop {
 .btn-clear-all:hover {
   color: #991b1b;
 }
+
+
+/* --- Details Filter Dropdown Fail-Safe --- */
+details.filter-dropdown-details {
+  position: relative;
+  display: inline-block;
+}
+details.filter-dropdown-details summary.btn-filter-trigger {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+details.filter-dropdown-details summary::-webkit-details-marker {
+  display: none;
+}
+details.filter-dropdown-details[open] summary {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+details.filter-dropdown-details[open] summary .arrow {
+  transform: rotate(180deg);
+}
+.filter-popover-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 150;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.15);
+  width: 290px;
+  overflow: hidden;
+}

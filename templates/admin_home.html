@@ -40,7 +40,7 @@
       </div>
     </div>
 
-    <!-- NOUVEAU MENU FILTRE DYNAMIQUE & RECHERCHE (COMPTES) -->
+    <!-- NOUVEAU MENU FILTRE INTERACTIF (COMPTES) -->
     <div class="filter-builder" style="margin-top:14px">
       <div class="filter-bar-header">
         
@@ -52,14 +52,13 @@
                  oninput="filterAccounts()">
         </div>
 
-        <!-- Menu déroulant dynamique de filtrage -->
-        <div class="filter-dropdown-container">
-          <button type="button" class="btn-filter-trigger" id="btn-trigger-account-filter" onclick="togglePopover('account')">
+        <!-- Menu déroulant dynamique par critères & valeurs -->
+        <details class="filter-dropdown-details" id="details-account-filter">
+          <summary class="btn-filter-trigger" id="btn-trigger-account-filter">
             <span>⚡ Filtrer par...</span> <span class="arrow">▾</span>
-          </button>
+          </summary>
 
-          <!-- Popover interactif -->
-          <div class="filter-popover" id="popover-account" style="display:none">
+          <div class="filter-popover-menu" id="popover-account">
             <!-- Étape 1 : Choix du critère -->
             <div id="account-crit-step">
               <div class="filter-popover-title">Choisir un critère :</div>
@@ -109,7 +108,7 @@
               {% endfor %}
             </div>
           </div>
-        </div>
+        </details>
 
         <!-- Zone des étiquettes (Chips) de filtres actifs -->
         <div class="active-filter-chips" id="account-active-chips"></div>
@@ -239,7 +238,7 @@
       </button>
     </div>
 
-    <!-- NOUVEAU MENU FILTRE DYNAMIQUE & RECHERCHE (BATTERIES) -->
+    <!-- NOUVEAU MENU FILTRE INTERACTIF (BATTERIES) -->
     <div class="filter-builder">
       <div class="filter-bar-header">
         
@@ -251,14 +250,13 @@
                  oninput="filterBatteriesTable()">
         </div>
 
-        <!-- Menu déroulant dynamique de filtrage -->
-        <div class="filter-dropdown-container">
-          <button type="button" class="btn-filter-trigger" id="btn-trigger-battery-filter" onclick="togglePopover('battery')">
+        <!-- Menu déroulant dynamique par critères & valeurs -->
+        <details class="filter-dropdown-details" id="details-battery-filter">
+          <summary class="btn-filter-trigger" id="btn-trigger-battery-filter">
             <span>⚡ Filtrer par...</span> <span class="arrow">▾</span>
-          </button>
+          </summary>
 
-          <!-- Popover interactif -->
-          <div class="filter-popover" id="popover-battery" style="display:none">
+          <div class="filter-popover-menu" id="popover-battery">
             <!-- Étape 1 : Choix du critère -->
             <div id="battery-crit-step">
               <div class="filter-popover-title">Choisir un critère :</div>
@@ -323,7 +321,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </details>
 
         <!-- Zone des étiquettes (Chips) de filtres actifs -->
         <div class="active-filter-chips" id="battery-active-chips"></div>
@@ -598,27 +596,22 @@ window.addEventListener('DOMContentLoaded', () => {
   if (hash === 'batteries' || hash === 'comptes') {
     switchMainTab(hash);
   }
-});
 
-// --- Gestion Popovers Interactifs (Fermeture au clic extérieur) ---
-function togglePopover(type) {
-  const popover = document.getElementById('popover-' + type);
-  const isHidden = (popover.style.display === 'none' || !popover.style.display);
-  closeAllPopovers();
-  if (isHidden) {
-    popover.style.display = 'block';
-    if (type === 'account') backToAccountCrit();
-    if (type === 'battery') backToBatteryCrit();
+  // Fermeture des menus détails au clic extérieur
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('details.filter-dropdown-details') && !e.target.closest('.admin-pill-btn')) {
+      document.querySelectorAll('details.filter-dropdown-details').forEach(d => d.removeAttribute('open'));
+    }
+  });
+
+  // Réinitialisation aux étapes initiales à chaque ouverture
+  const dAccount = document.getElementById('details-account-filter');
+  if (dAccount) {
+    dAccount.addEventListener('toggle', () => { if (dAccount.open) backToAccountCrit(); });
   }
-}
-
-function closeAllPopovers() {
-  document.querySelectorAll('.filter-popover').forEach(p => p.style.display = 'none');
-}
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.filter-dropdown-container') && !e.target.closest('.admin-pill-btn')) {
-    closeAllPopovers();
+  const dBattery = document.getElementById('details-battery-filter');
+  if (dBattery) {
+    dBattery.addEventListener('toggle', () => { if (dBattery.open) backToBatteryCrit(); });
   }
 });
 
@@ -633,13 +626,17 @@ const accountActiveFilters = {
 };
 
 function backToAccountCrit() {
-  document.getElementById('account-crit-step').style.display = 'block';
-  document.getElementById('account-val-role').style.display = 'none';
-  document.getElementById('account-val-battery').style.display = 'none';
+  const step = document.getElementById('account-crit-step');
+  const r = document.getElementById('account-val-role');
+  const b = document.getElementById('account-val-battery');
+  if (step) step.style.display = 'block';
+  if (r) r.style.display = 'none';
+  if (b) b.style.display = 'none';
 }
 
 function openAccountCritValues(crit) {
-  document.getElementById('account-crit-step').style.display = 'none';
+  const step = document.getElementById('account-crit-step');
+  if (step) step.style.display = 'none';
   if (crit === 'role') document.getElementById('account-val-role').style.display = 'block';
   if (crit === 'battery') document.getElementById('account-val-battery').style.display = 'block';
 }
@@ -648,7 +645,9 @@ function applyAccountFilterCriteria(crit, value, displayLabel) {
   accountActiveFilters[crit] = value;
   if (crit === 'role') accountActiveFilters.roleLabel = displayLabel;
 
-  closeAllPopovers();
+  const d = document.getElementById('details-account-filter');
+  if (d) d.removeAttribute('open');
+
   renderAccountFilterChips();
   filterAccounts();
 }
@@ -666,6 +665,9 @@ function clearAllAccountFilters() {
   accountActiveFilters.roleLabel = '';
   accountActiveFilters.battery = null;
   document.getElementById('account-search-input').value = '';
+
+  const d = document.getElementById('details-account-filter');
+  if (d) d.removeAttribute('open');
 
   renderAccountFilterChips();
   filterAccounts();
@@ -767,14 +769,19 @@ function switchBatteryFilterTab(filterKey) {
 }
 
 function backToBatteryCrit() {
-  document.getElementById('battery-crit-step').style.display = 'block';
-  document.getElementById('battery-val-status').style.display = 'none';
-  document.getElementById('battery-val-loc').style.display = 'none';
-  document.getElementById('battery-val-health').style.display = 'none';
+  const step = document.getElementById('battery-crit-step');
+  const st = document.getElementById('battery-val-status');
+  const l = document.getElementById('battery-val-loc');
+  const h = document.getElementById('battery-val-health');
+  if (step) step.style.display = 'block';
+  if (st) st.style.display = 'none';
+  if (l) l.style.display = 'none';
+  if (h) h.style.display = 'none';
 }
 
 function openBatteryCritValues(crit) {
-  document.getElementById('battery-crit-step').style.display = 'none';
+  const step = document.getElementById('battery-crit-step');
+  if (step) step.style.display = 'none';
   if (crit === 'status') document.getElementById('battery-val-status').style.display = 'block';
   if (crit === 'loc') document.getElementById('battery-val-loc').style.display = 'block';
   if (crit === 'health') document.getElementById('battery-val-health').style.display = 'block';
@@ -784,7 +791,9 @@ function applyBatteryFilterCriteria(crit, value, displayLabel) {
   batteryActiveFilters[crit] = value;
   batteryActiveFilters[crit + 'Label'] = displayLabel;
 
-  closeAllPopovers();
+  const d = document.getElementById('details-battery-filter');
+  if (d) d.removeAttribute('open');
+
   renderBatteryFilterChips();
   filterBatteriesTable();
 }
@@ -805,8 +814,11 @@ function clearAllBatteryFilters() {
   batteryActiveFilters.health = null;
   batteryActiveFilters.healthLabel = '';
   document.getElementById('battery-search-input').value = '';
-  switchBatteryFilterTab('all');
 
+  const d = document.getElementById('details-battery-filter');
+  if (d) d.removeAttribute('open');
+
+  switchBatteryFilterTab('all');
   renderBatteryFilterChips();
   filterBatteriesTable();
 }
