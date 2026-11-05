@@ -1,0 +1,47 @@
+{% extends "doc_base.html" %}
+{% import "_doc_macros.html" as d with context %}
+{% block title %}Manifeste {{ doc.order.uid }}{% endblock %}
+{% block doc %}
+{{ d.head(doc, 'Manifeste de transfert et preuve de dépôt') }}
+<section class="doc-grid">
+  {{ d.party('Producteur / responsable du passeport', doc.parties.producer) }}
+  {{ d.party('Détenteur (lieu d\'enlèvement)', doc.parties.holder) }}
+  {{ d.party('Transporteur', doc.parties.carrier) }}
+  {{ d.party('Destinataire', doc.parties.destination) }}
+</section>
+{{ d.goods(doc) }}
+<div class="doc-box">
+  <h3>Prise en charge</h3>
+  {% set c = doc.custody %}
+  <table>
+    <tr><th>Scellé</th><th>Remis par</th><th>Pesée enlèvement</th><th>Pesée réception</th><th>Écart</th></tr>
+    <tr><td>{{ c.sealNumber or '—' }}</td><td>{{ c.handedOverBy or '—' }}</td>
+      <td>{{ (c.pickupWeightKg ~ ' kg') if c.pickupWeightKg else '—' }}</td>
+      <td>{{ (c.receptionWeightKg ~ ' kg') if c.receptionWeightKg else '—' }}</td>
+      <td>{{ (c.weightDeviationPct ~ ' %') if c.weightDeviationPct is defined else '—' }}</td></tr>
+  </table>
+  {% if c.anomaly %}<p><strong>Anomalie :</strong> {{ c.anomaly }}</p>{% endif %}
+  {% if doc.order.refusalReason %}<p><strong>Refus à réception :</strong> {{ doc.order.refusalReason }}</p>{% endif %}
+</div>
+<div class="doc-box">
+  <h3>Étapes signées (empreintes SHA-256 chaînées)</h3>
+  <table>
+    <tr><th>#</th><th>Étape</th><th>Date</th><th>Acteur</th><th>Empreinte</th></tr>
+    {% for s in doc.steps %}
+    <tr><td>{{ s.seq }}</td><td>{{ s.label }}</td><td>{{ s.at|replace('T', ' ') }}</td><td>{{ s.actor }}</td>
+      <td class="hash">{{ s.hash[:24] }}…</td></tr>
+    {% endfor %}
+  </table>
+</div>
+<div class="doc-box receipt {{ 'ok' if doc.custody.receiptCode else '' }}">
+  {% if doc.custody.receiptCode %}
+    <h3>Preuve de dépôt</h3>
+    <div class="receipt-code">{{ doc.custody.receiptCode }}</div>
+    <div>Batterie réceptionnée par {{ doc.parties.destination.name }} le {{ doc.order.receivedAt|replace('T', ' ') }}.</div>
+  {% else %}
+    <h3>Preuve de dépôt</h3><div class="muted">En attente de la réception par le centre de tri.</div>
+  {% endif %}
+  <div class="small">Chaîne de preuves : {{ 'intacte' if doc.integrity.valid else 'ALTÉRÉE à l\'étape ' ~ doc.integrity.brokenAtStep }}
+    · dernière empreinte <span class="hash">{{ doc.integrity.lastHash or '—' }}</span></div>
+</div>
+{% endblock %}

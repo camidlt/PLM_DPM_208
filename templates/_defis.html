@@ -1,0 +1,133 @@
+{% import "_macros.html" as ui with context %}
+{# Composants d'interface des défis 1 (télémétrie BMS) et 3 (aide à la décision). #}
+
+{% macro telemetry_card(p, readings, chart) %}
+{% set last = readings[-1] if readings else None %}
+<div class="card" id="telemetry" data-live-telemetry="{{ p.battery.batteryId }}"
+     data-last="{{ last.at if last else '' }}">
+  <div class="row" style="justify-content:space-between">
+    <h2 style="margin:0">Télémétrie BMS</h2>
+    <span class="live small" title="La page se met à jour à chaque nouvelle trame BMS">● en direct</span>
+  </div>
+  {% if not last %}
+    <p class="muted small">Aucun relevé BMS reçu pour cette batterie.</p>
+  {% else %}
+    <p class="small muted" style="margin:.35rem 0 .6rem">
+      Dernier relevé : <strong>{{ last.at|replace('T', ' ') }}</strong> · source {{ last.source }}
+      {% if last.soh is defined and last.soh is not none %} · SOH {{ last.soh }} %{% endif %}
+      {% if last.soc is defined and last.soc is not none %} · SOC {{ last.soc }} %{% endif %}
+      · {{ readings|length }} relevé(s)</p>
+    {% if chart %}
+    <figure class="chart" aria-label="Évolution de la résistance interne par module">
+      <svg viewBox="0 0 {{ chart.width }} {{ chart.height }}" role="img">
+        {% for t in chart.ticks %}
+          <line class="grid" x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ t.y }}" y2="{{ t.y }}"/>
+          <text class="tick" x="{{ chart.left - 6 }}" y="{{ t.y + 4 }}" text-anchor="end">{{ t.v }}</text>
+        {% endfor %}
+        {% if chart.threshold_y %}
+          <line class="threshold" x1="{{ chart.left }}" x2="{{ chart.right }}"
+                y1="{{ chart.threshold_y }}" y2="{{ chart.threshold_y }}"/>
+          <text class="threshold-label" x="{{ chart.left + 4 }}" y="{{ chart.threshold_y - 5 }}">seuil max {{ chart.threshold }} mΩ</text>
+        {% endif %}
+        {% for l in chart.lines %}
+          <polyline class="series {{ 'hot' if l.hot }}" points="{{ l.points }}"/>
+          <circle class="series-end {{ 'hot' if l.hot }}" cx="{{ l.end_x }}" cy="{{ l.end_y }}" r="3"/>
+          <text class="series-label {{ 'hot' if l.hot }}" x="{{ l.end_x + 7 }}" y="{{ l.label_y + 4 }}">M{{ l.index }}</text>
+        {% endfor %}
+        <text class="tick" x="{{ chart.left }}" y="{{ chart.height - 4 }}">{{ chart.first_at[:10] }}</text>
+        <text class="tick" x="{{ chart.right }}" y="{{ chart.height - 4 }}" text-anchor="end">{{ chart.last_at[:10] }}</text>
+      </svg>
+      <figcaption class="small muted">Résistance interne (mΩ) des modules sur les {{ chart.count }} derniers relevés.
+        En rouge : module au-delà du seuil constructeur.</figcaption>
+    </figure>
+    {% endif %}
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{% macro decision_card(p, reco, orientation, can_decide=False, show_form_hint=False) %}
+<div class="card decision" id="decision">
+  <h2>Aide à la décision : fin de vie</h2>
+
+  <div class="reco reco-{{ reco.recommended }}">
+    <div class="reco-icon" aria-hidden="true">{{ reco.icon }}</div>
+    <div>
+      <div class="small">Recommandation</div>
+      <div class="reco-label">{{ reco.label }}</div>
+      <div class="small">{{ reco.summary }} Statut cible : {{ ui.status_badge(reco.status) }}</div>
+    </div>
+  </div>
+
+  {% if reco.notes %}
+  <ul class="notes small">{% for n in reco.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <p class="small muted" style="margin:.75rem 0 .4rem">Hiérarchie des déchets : la première option
+    possible est recommandée. Ouvrir une option pour voir ses critères.</p>
+  <div class="options">
+    {% for o in reco.options %}
+    <details class="opt {{ 'eligible' if o.eligible else 'excluded' }} {{ 'chosen' if o.key == reco.recommended }}">
+      <summary>
+        <span aria-hidden="true">{{ o.icon }}</span>
+        <span class="opt-name">{{ o.label }}</span>
+        <span class="opt-score">{{ o.passed }}/{{ o.total }}</span>
+        <span class="badge {{ 'st-APPROVED' if o.eligible else 'st-REJECTED' }}">{{ 'possible' if o.eligible else 'exclu' }}</span>
+      </summary>
+      <table class="criteria">
+        {% for c in o.criteria %}
+        <tr class="{{ 'ok' if c.ok else 'ko' }}">
+          <td class="mark">{{ '✓' if c.ok else '✗' }}</td>
+          <td>{{ c.label }}</td><td><strong>{{ c.value }}</strong></td><td class="muted">{{ c.rule }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </details>
+    {% endfor %}
+  </div>
+
+  {% if reco.materials %}
+  <details class="materials">
+    <summary class="small">Matériaux récupérables au recyclage</summary>
+    <div class="row small" style="margin-bottom:.5rem">
+      {% for m in reco.materials %}
+        <span class="mat {{ 'crm' if m.critical }}" title="{{ m.part }}">{{ m.material }} {{ m.percentage }} %{% if m.critical %} · critique{% endif %}</span>
+      {% endfor %}
+    </div>
+    <p class="small muted" style="margin:0">Taux de valorisation exigés par le règlement (UE) 2023/1542
+      (fin 2027 / fin 2031) :
+      {% for name, a, b in recovery_targets %}{{ name }} {{ a }} % / {{ b }} %{% if not loop.last %} · {% endif %}{% endfor %}.</p>
+  </details>
+  {% endif %}
+
+  <h3 style="margin-top:1rem">Orientation retenue</h3>
+  {% if orientation %}
+    <div class="alert ok"><span class="icon">📋</span><div>
+      <strong>{{ decision_options[orientation.choice].label }}</strong>
+      {{ orientation.at|replace('T', ' ') }} · {{ orientation.decidedBy }}
+      {% if orientation.choice != orientation.recommended %}
+        <div class="small">Écart à la recommandation ({{ decision_options[orientation.recommended].label }}) :
+          {{ orientation.comment }}</div>
+      {% elif orientation.comment %}<div class="small">{{ orientation.comment }}</div>{% endif %}
+    </div></div>
+  {% elif can_decide %}
+    <form method="post" action="{{ url_for('tri_orientation', battery_id=p.battery.batteryId) }}">
+      <div class="choices">
+        {% for o in reco.options %}
+        <label class="choice {{ 'disabled' if not o.eligible }}">
+          <input type="radio" name="choice" value="{{ o.key }}" {% if o.key == reco.recommended %}checked{% endif %}
+                 {% if not o.eligible %}disabled{% endif %}>
+          {{ o.icon }} {{ o.label }}{% if o.key == reco.recommended %} <span class="small muted">(recommandé)</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      <label for="orientation-comment">Commentaire <span class="muted small">(obligatoire si vous ne suivez pas la recommandation)</span></label>
+      <textarea id="orientation-comment" name="comment" placeholder="Constat visuel, filière de destination…"></textarea>
+      <button class="btn accent block" style="margin-top:12px" type="submit">Enregistrer l'orientation</button>
+    </form>
+  {% else %}
+    <p class="small muted" style="margin:0">L'orientation est enregistrée par le centre de tri,
+      une fois la batterie réceptionnée.</p>
+  {% endif %}
+</div>
+{% endmacro %}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui with context %}
+{% import "_defis.html" as defis with context %}
 {% block title %}{{ p.battery.batteryId }} · Garagiste{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('garage_home') }}">← Scanner une autre batterie</a></p>
@@ -9,7 +10,7 @@
   <div>
     {{ ui.performance(p) }}
     {{ ui.modules(p) }}
-    {{ ui.safety_card(p) }}
+    {{ defis.telemetry_card(p, readings, chart) }}
     {{ ui.identification(p) }}
   </div>
   <div>
@@ -18,6 +19,13 @@
       {% if p.battery.status != 'Original' %}
         <div class="alert info"><span class="icon">ℹ️</span>
           <div>Statut actuel : <strong>{{ p.battery.status }}</strong>. Aucune action garagiste possible.</div></div>
+        {% set t = p.transfer %}
+        {% if t and t.state in ('ORDERED', 'SCHEDULED') %}
+        <div class="alert warn" style="margin-top:10px"><span class="icon">🚚</span><div>
+          <strong>{{ 'Enlèvement prévu le ' ~ t.pickupDate ~ ' ' ~ (t.pickupSlot or '') if t.pickupDate else 'Enlèvement à planifier par le propriétaire' }}</strong>
+          Vers {{ t.toName }}. Préparez la batterie (bornes protégées) et remettez-la au transporteur contre scellé.
+          <div><a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">Ordre de transfert</a></div></div></div>
+        {% endif %}
       {% elif p.pending_request %}
         <div class="alert warn"><span class="icon">⏳</span>
           <div><strong>Demande envoyée, en attente du propriétaire</strong>
@@ -32,8 +40,28 @@
           <select id="fault_type" name="fault_type">
             {% for f in fault_types %}<option {% if alerts and loop.first %}selected{% endif %}>{{ f }}</option>{% endfor %}
           </select>
+          <label for="destination">Centre de tri de destination</label>
+          <select id="destination" name="destination" required>
+            {% for c in centers %}
+              <option value="{{ c.uid }}">{{ c.name }} ({{ c.city }})</option>
+            {% endfor %}
+          </select>
           <label for="comment">Commentaire</label>
           <textarea id="comment" name="comment" placeholder="Constat, mesures, réparation impossible…">{% if alerts %}Module {{ alerts[0].index }} hors tolérance, non réparable sur site.{% endif %}</textarea>
+          <label><input type="checkbox" name="auto_logistics" value="1" checked> Planifier automatiquement la collecte (mode logistique magasin)</label>
+          <div class="grid two" style="margin-top:8px">
+            <div>
+              <label for="pickup_date">Date d'enlèvement auto</label>
+              <input id="pickup_date" type="date" name="pickup_date" value="{{ today }}" min="{{ today }}">
+            </div>
+            <div>
+              <label for="pickup_slot">Créneau auto</label>
+              <select id="pickup_slot" name="pickup_slot">
+                <option>8h-12h</option>
+                <option>14h-18h</option>
+              </select>
+            </div>
+          </div>
           <button class="btn danger block" style="margin-top:12px" type="submit">Signaler hors d'usage</button>
         </form>
       {% endif %}

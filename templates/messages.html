@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Messages · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Messages</h1>
+<p class="muted small">Notifications du transfert des batteries. Chacune est aussi envoyée par mail à l'adresse de votre structure
+  (simulé tant que le serveur mail n'est pas configuré).</p>
+{% for m in messages %}
+  <div class="card msg {{ 'unread' if not m.read }}">
+    <div class="row" style="justify-content:space-between">
+      <strong>{{ m.subject }}</strong>
+      <span class="small muted">{{ m.at|replace('T', ' ') }}</span>
+    </div>
+    <p style="margin:.4rem 0">{{ m.body }}</p>
+    <div class="small muted">{{ m.channel }}{% if m.email %} · {{ m.email }}{% endif %}
+      {% if m.link %} · <a href="{{ m.link }}">Ouvrir</a>{% endif %}</div>
+  </div>
+{% else %}
+  <div class="card"><p class="muted" style="margin:0">Aucun message.</p></div>
+{% endfor %}
+{% endblock %}

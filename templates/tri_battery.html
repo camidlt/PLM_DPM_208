@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui with context %}
+{% import "_defis.html" as defis with context %}
 {% block title %}{{ p.battery.batteryId }} · Centre de tri{% endblock %}
 {% block wrapclass %}narrow{% endblock %}
 {% block content %}
@@ -8,62 +9,77 @@
 
 {% set t = p.transfer %}
 {% if p.battery.status == 'Waste' %}
-  <div class="status-check ok card compact">
+  <div class="status-check ok card">
     <div>Statut du Battery Passport</div>
     <div class="big">✅ WASTE</div>
     <div>Le statut est à jour : la batterie peut être prise en charge.</div>
   </div>
 {% else %}
-  <div class="status-check bad card compact">
+  <div class="status-check bad card">
     <div>Statut du Battery Passport</div>
     <div class="big">⛔ {{ p.battery.status|upper }}</div>
     <div>Statut NON à jour : ne pas prendre en charge, contacter le propriétaire.</div>
   </div>
 {% endif %}
 
-<div class="card reception">
+<div class="card">
   <h2>Réception</h2>
   {% if t and t.state == 'RECEIVED' %}
     <div class="alert ok"><span class="icon">📦</span><div><strong>Réceptionnée</strong>
-      par {{ t.toName }} le {{ t.receivedAt|replace('T', ' ') }} (ordre {{ t.uid }})</div></div>
-  {% elif t and t.state == 'ORDERED' and t.toUid == user.actor_uid and p.battery.status == 'Waste' %}
-    <p class="small">Ordre de transfert <strong>{{ t.uid }}</strong> depuis {{ t.fromName or '—' }}.</p>
-    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}">
-      <button class="btn accent block" type="submit">📦 Confirmer la réception</button>
-    </form>
-  {% elif t and t.state == 'ORDERED' %}
+      par {{ t.toName }} le {{ t.receivedAt|replace('T', ' ') }} (ordre {{ t.uid }})
+      {% if t.receiptCode %}<div>Preuve de dépôt : <strong>{{ t.receiptCode }}</strong></div>{% endif %}
+      {% if t.anomaly %}<div class="small">⚠ {{ t.anomaly }}</div>{% endif %}</div></div>
+  {% elif t and t.state in ('ORDERED', 'SCHEDULED', 'PICKED_UP') and t.toUid != user.actor_uid %}
     <div class="alert warn"><span class="icon">↪️</span><div>Cette batterie est attendue par
       <strong>{{ t.toName }}</strong>, pas par votre centre.</div></div>
+  {% elif t and t.state in ('ORDERED', 'SCHEDULED') %}
+    <div class="alert info"><span class="icon">🕓</span><div><strong>Pas encore enlevée</strong>
+      {% if t.pickupDate %}Enlèvement prévu le {{ t.pickupDate }} {{ t.pickupSlot or '' }} chez {{ t.fromName }}.
+      {% else %}Le transporteur n'est pas encore affecté.{% endif %}
+      La réception sera possible à l'arrivée du transporteur.</div></div>
+  {% elif t and t.state == 'PICKED_UP' and p.battery.status == 'Waste' %}
+    <p class="small">Ordre <strong>{{ t.uid }}</strong> · transporteur {{ t.carrierName or '—' }}
+      · depuis {{ t.fromName or '—' }}. Vérifiez le scellé et pesez la batterie.</p>
+    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}">
+      <div class="grid two">
+        <div><label for="seal">N° de scellé lu sur l'emballage</label>
+          <input id="seal" name="seal" required autocapitalize="characters" placeholder="ex. SC-104522"></div>
+        <div><label for="weight">Poids pesé (kg)</label>
+          <input id="weight" name="weight" required inputmode="decimal" placeholder="ex. 521"></div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" name="check_seal" value="1" required> Scellé intact</label>
+        <label><input type="checkbox" name="check_packaging" value="1" required> Emballage intact : ni fuite, ni échauffement, ni odeur</label>
+      </div>
+      <label for="rcomment">Commentaire (optionnel)</label>
+      <input id="rcomment" name="comment" placeholder="ex. stockée zone B, rack 4">
+      <button class="btn accent block" style="margin-top:10px" type="submit">📦 Confirmer la réception</button>
+    </form>
+    <details style="margin-top:12px"><summary class="small">Anomalie : refuser la réception</summary>
+      <form method="post" action="{{ url_for('tri_refuse', battery_id=p.battery.batteryId) }}">
+        <label for="reason">Motif du refus</label>
+        <input id="reason" name="reason" required placeholder="ex. scellé rompu, emballage chaud">
+        <button class="btn danger block" style="margin-top:10px" type="submit">Refuser la batterie</button>
+      </form>
+    </details>
+  {% elif t and t.state == 'REFUSED' %}
+    <div class="alert bad"><span class="icon">⛔</span><div><strong>Réception refusée</strong>
+      {{ t.refusedAt|replace('T', ' ') }} : {{ t.refusalReason }}. En attente d'une redirection par le propriétaire.</div></div>
   {% else %}
     <div class="alert warn"><span class="icon">❓</span><div>Aucun ordre de transfert pour cette batterie.</div></div>
   {% endif %}
 </div>
 
-{# Défi 3 : aide à la décision (au centre de l'écran) #}
-{% include "_decision_panel.html" %}
+{% if t %}<p class="small"><a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">Suivi du transfert et documents (ordre, manifeste) →</a></p>{% endif %}
 
-{# Fiche technique complète repliée sous le panneau pour un usage terrain rapide #}
-<details class="fiche card" style="margin-top:14px">
-  <summary style="font-weight:700; cursor:pointer; padding:6px 0">📋 Fiche technique complète & contrôles</summary>
-  <div style="margin-top:12px">
-    <div class="card" style="margin-bottom:12px">
-      <h2>Contrôle Réception Tronc Commun (#1, #2, #11)</h2>
-      <dl class="kv">
-        <dt>Catégorie de batterie (#9)</dt><dd>{{ p.type.name if p.type else 'EV Traction' }}</dd>
-        <dt>Masse totale (#10)</dt><dd><strong>{{ p.battery.weightKg if p.battery.weightKg else '450' }} kg</strong> (engins requis)</dd>
-        <dt>Substances dangereuses (#34)</dt><dd><span class="badge st-REJECTED">Matières dangereuses ADR · Classe 9</span></dd>
-        <dt>Agent d'extinction stockage (#15)</dt><dd>{{ p.circularity.extinguishAgent if p.circularity else 'Eau (refroidissement massif)' }}</dd>
-        <dt>Consignes sécurité (#39)</dt><dd>Zone de quarantaine ventilée ignifugée à distance des cellules saines</dd>
-      </dl>
-    </div>
-    {{ ui.performance(p) }}
-    {{ ui.modules(p) }}
-    {{ ui.composition(p) }}
-    {{ ui.sustainability(p) }}
-    {{ ui.identification(p) }}
-    {{ ui.history_card(history) }}
-  </div>
-</details>
+{% set can_decide = p.battery.status == 'Waste' and p.location and p.location.uid == user.actor_uid %}
+{{ defis.decision_card(p, reco, orientation, can_decide) }}
 
-<script src="{{ url_for('static', filename='defi3.js') }}"></script>
+{{ ui.performance(p) }}
+{{ ui.modules(p) }}
+{{ defis.telemetry_card(p, readings, chart) }}
+{{ ui.composition(p) }}
+{{ ui.sustainability(p) }}
+{{ ui.identification(p) }}
+{{ ui.history_card(history) }}
 {% endblock %}

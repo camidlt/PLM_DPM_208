@@ -25,6 +25,21 @@
   {% endfor %}
 </div>
 
+<div class="card" id="transfers">
+  <h2>🚚 Transferts vers les centres de tri</h2>
+  {% if transfers %}
+  <div class="table-wrap"><table>
+    <tr><th>Ordre</th><th>Batterie</th><th>Destination</th><th>Transporteur</th><th>Enlèvement</th><th>État</th></tr>
+    {% for t in transfers %}
+    <tr><td><a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ t.uid }}</a></td>
+      <td>{{ t.batteryId }}</td><td>{{ t.toName }}</td>
+      <td>{{ t.carrierName or '—' }}</td><td>{{ t.pickupDate or '—' }}</td>
+      <td>{{ ui.status_badge(t.state) }}{% if t.state == 'ORDERED' %} <span class="small muted">à planifier</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="muted">Aucun transfert. Un ordre est créé quand vous validez une demande « hors d'usage ».</p>{% endif %}
+</div>
+
 <div class="card">
   <h2>Flotte de batteries</h2>
   <div class="table-wrap"><table>

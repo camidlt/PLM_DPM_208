@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as ui with context %}
+{% import "_defis.html" as defis with context %}
 {% block title %}{{ p.battery.batteryId }} · Propriétaire{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('owner_home') }}">← Tableau de bord</a></p>
@@ -14,12 +15,8 @@
 </div>
 {% endif %}
 <div class="grid two" style="margin-top:16px">
-  <div>
-    {{ ui.identification(p) }}
-    {{ ui.performance(p) }}
-    {{ ui.modules(p) }}
-    {{ ui.safety_card(p) }}
-  </div>
-  <div>{{ ui.transfer_card(p) }}{{ ui.composition(p) }}{{ ui.sustainability(p) }}{{ ui.history_card(history) }}</div>
+  <div>{{ ui.identification(p) }}{{ ui.performance(p) }}{{ ui.modules(p) }}
+       {{ defis.telemetry_card(p, readings, chart) }}</div>
+  <div>{{ defis.decision_card(p, reco, orientation) }}{{ ui.transfer_card(p) }}{{ ui.composition(p) }}{{ ui.sustainability(p) }}{{ ui.history_card(history) }}</div>
 </div>
 {% endblock %}

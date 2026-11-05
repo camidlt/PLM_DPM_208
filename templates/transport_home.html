@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}Transporteur · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<h1>Missions d'enlèvement</h1>
+<p class="muted">Au garage, scannez le QR code de la batterie pour ouvrir la mission et enregistrer l'enlèvement.</p>
+{{ ui.scan_box([], 'Scanner une batterie à enlever') }}
+<div class="card">
+  <h2>Missions en cours ({{ active|length }})</h2>
+  {% for t in active %}
+    <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:.5rem 0">
+      <a href="{{ url_for('transfer_detail', order_uid=t.uid) }}"><strong>{{ t.batteryId }}</strong></a>
+      <span>{{ ui.status_badge(t.state) }}</span>
+      <span class="small muted" style="width:100%">{{ t.pickupDate }} {{ t.pickupSlot or '' }} · {{ t.fromName }} → {{ t.toName }} · ordre {{ t.uid }}</span>
+    </div>
+  {% else %}<p class="muted">Aucune mission en cours.</p>{% endfor %}
+</div>
+{% if done %}
+<div class="card">
+  <h2>Missions terminées</h2>
+  {% for t in done %}
+    <div class="row" style="justify-content:space-between;border-bottom:1px solid var(--line);padding:.5rem 0">
+      <a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ t.batteryId }}</a>
+      <span>{{ ui.status_badge(t.state) }}</span>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% include "_scan_scripts.html" %}{% endblock %}

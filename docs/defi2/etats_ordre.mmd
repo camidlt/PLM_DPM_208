@@ -1,0 +1,13 @@
+stateDiagram-v2
+  direction LR
+  [*] --> ORDERED: validation Waste
+  ORDERED --> SCHEDULED: affectation
+  SCHEDULED --> SCHEDULED: replanifier
+  SCHEDULED --> PICKED_UP: enlèvement
+  PICKED_UP --> RECEIVED: réception
+  PICKED_UP --> REFUSED: refus
+  ORDERED --> CANCELLED: annulation
+  SCHEDULED --> CANCELLED: annulation
+  REFUSED --> [*]: redirection
+  CANCELLED --> [*]: nouvel ordre
+  RECEIVED --> [*]: preuve de dépôt

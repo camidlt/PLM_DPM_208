@@ -4,7 +4,6 @@ Permet de faire tourner la démo sans Neo4j. Les données sont partagées entre
 tous les navigateurs connectés au même serveur, et remises à zéro au redémarrage.
 """
 import copy
-import json
 import threading
 import uuid
 from datetime import datetime
@@ -115,15 +114,17 @@ class MemoryRepo:
             )
 
     def _latest_transfer(self, battery_uid):
+        # un ordre remplacé (défi 2 : annulation / redirection) passe après son remplaçant
         orders = sorted(self._in(battery_uid, "FOR", "TransferOrder"),
-                        key=lambda t: t["createdAt"], reverse=True)
+                        key=lambda t: (not t.get("supersededBy"), t["createdAt"]), reverse=True)
         if not orders:
             return None
         t = orders[0]
         to = self._out(t["uid"], "TO")[0]
         frm = (self._out(t["uid"], "FROM") or [{}])[0]
+        car = (self._out(t["uid"], "ASSIGNED_TO") or [{}])[0]   # défi 2
         return dict(self._clean(t), toUid=to["uid"], toName=to["name"], toAgreed=to.get("agreed"),
-                    fromName=frm.get("name"))
+                    fromName=frm.get("name"), carrierName=car.get("name"))
 
     def get_history(self, battery_id):
         with self.lock:
@@ -164,101 +165,18 @@ class MemoryRepo:
                 out.append(dict(self._clean(t), batteryId=b["batteryId"], status=b["status"]))
             return sorted(out, key=lambda t: t["createdAt"], reverse=True)
 
-    # --- défi 3 : demandes du marché et décisions ------------------------------
-    def list_demands(self):
-        with self.lock:
-            return sorted((self._clean(n) for n in self.nodes.values()
-                           if n["_label"] == "MarketDemand"),
-                          key=lambda d: (d.get("option", ""), d.get("title", "")))
-
-    def set_demand_active(self, demand_uid, active):
-        with self.lock:
-            n = self.nodes.get(demand_uid)
-            if n and n["_label"] == "MarketDemand":
-                n["active"] = bool(active)
-
-    def add_demand(self, center_uid, title, option, partner, chemistries, min_soce, urgency, quantity=1, location="France"):
-        with self.lock:
-            uid = new_uid("DEM")
-            self._add("MarketDemand", uid, title=title, option=option, partner=partner,
-                      chemistries=chemistries, minSoce=min_soce, urgency=urgency,
-                      quantity=quantity, location=location, active=True)
-            self.rels.append([uid, "OFFERED_TO", center_uid])
-            return uid
-
-    def delete_demand(self, demand_uid):
-        with self.lock:
-            if demand_uid in self.nodes:
-                del self.nodes[demand_uid]
-                self.rels = [r for r in self.rels if r[0] != demand_uid and r[2] != demand_uid]
-
-    def get_center_policy(self, center_uid):
-        with self.lock:
-            n = self.nodes.get(center_uid) or {}
-            return dict(use_market=n.get("policyMarket", True),
-                        use_hierarchy=n.get("policyHierarchy", True))
-
-    def set_center_policy(self, center_uid, use_market, use_hierarchy):
-        with self.lock:
-            n = self.nodes.get(center_uid)
-            if n:
-                n["policyMarket"] = bool(use_market)
-                n["policyHierarchy"] = bool(use_hierarchy)
-
-    def get_decisions(self, battery_id):
-        with self.lock:
-            b = self._battery(battery_id)
-            if b is None:
-                return []
-            decs = []
-            for d in self._out(b["uid"], "HAS_DECISION", "Decision"):
-                dec = self._clean(d)
-                # chercher la demande du marché liée
-                fulfilled = self._out(d["uid"], "FULFILLS", "MarketDemand")
-                if fulfilled:
-                    dec["demandTitle"] = fulfilled[0].get("title")
-                decs.append(dec)
-            return sorted(decs, key=lambda d: d.get("at", ""), reverse=True)
-
-    def record_decision(self, battery_id, center_uid, chosen, comment, result):
-        """Enregistre la décision du centre de tri (défi 3)."""
-        with self.lock:
-            from .decision import OPTION_FR
-            b = self._battery(battery_id)
-            overridden = chosen != result["recommendation"]
-            demand_uid = None
-            opts = {o["option"]: o for o in result["options"]}
-            if opts[chosen]["demands"]:
-                demand_uid = opts[chosen]["demands"][0]["uid"]
-            uid = new_uid("DEC")
-            self._add("Decision", uid,
-                      recommendation=result["recommendation"], chosen=chosen,
-                      overridden=overridden, comment=(comment or "").strip(),
-                      scores=json.dumps({o["option"]: o["score"] for o in result["options"]}),
-                      justification=result["justification"],
-                      weights=json.dumps(result["weights"]),
-                      marketDriven=result["market_driven"],
-                      policyMarket=result.get("priorities", {}).get("use_market", True),
-                      policyHierarchy=result.get("priorities", {}).get("use_hierarchy", True),
-                      at=now(), decidedBy=self.nodes[center_uid]["name"])
-            self.rels.append([b["uid"], "HAS_DECISION", uid])
-            self.rels.append([center_uid, "MADE", uid])
-            if demand_uid and demand_uid in self.nodes:
-                self.rels.append([uid, "FULFILLS", demand_uid])
-            detail = f"Décision : {chosen} (recommandé : {result['recommendation']})"
-            if comment and comment.strip():
-                detail += f" - {comment.strip()}"
-            self._event(b["uid"], "DECISION_RECORDED", center_uid, detail)
-            return uid
-
     # --- écritures (appelées par bp.workflow après contrôle des règles) ---------
     def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,
-                              requested_status, reason, diagnostic):
+                                                            requested_status, reason, diagnostic, destination_uid,
+                                                            auto_logistics=False, pickup_date="", pickup_slot=""):
         with self.lock:
             b = self._battery(battery_id)
             uid = self._add("Notification", new_uid("NOTIF"), type="STATUS_CHANGE_REQUEST",
                             fromStatus=from_status, requestedStatus=requested_status,
-                            reason=reason, diagnostic=diagnostic, state="PENDING", createdAt=now())
+                                                        reason=reason, diagnostic=diagnostic,
+                                                        destinationUid=destination_uid, autoLogistics=bool(auto_logistics),
+                                                        pickupDate=pickup_date or "", pickupSlot=pickup_slot or "",
+                                                        state="PENDING", createdAt=now())
             self.rels += [[actor_uid, "SENT", uid], [uid, "ABOUT", b["uid"]],
                           [uid, "ADDRESSED_TO", operator_uid]]
             self._event(b["uid"], "FAULT_REPORTED", actor_uid,
@@ -296,3 +214,143 @@ class MemoryRepo:
             self.rels = [r for r in self.rels if not (r[0] == b["uid"] and r[1] == "LOCATED_AT")]
             self.rels.append([b["uid"], "LOCATED_AT", center_uid])
             self._event(b["uid"], "RECEIVED", center_uid, f"Batterie réceptionnée (ordre {order_uid})")
+
+    # --- Défi 2 : logistique du transfert -------------------------------------------
+    def get_actor(self, uid):
+        with self.lock:
+            n = self.nodes.get(uid)
+            return self._clean(n) if n and n["_label"] == "Actor" else None
+
+    def _transfer_dict(self, t):
+        b = self._out(t["uid"], "FOR")[0]
+        to = self._out(t["uid"], "TO")[0]
+        frm = (self._out(t["uid"], "FROM") or [{}])[0]
+        car = (self._out(t["uid"], "ASSIGNED_TO") or [{}])[0]
+        return dict(self._clean(t), batteryId=b["batteryId"], batteryStatus=b["status"],
+                    toUid=to["uid"], toName=to["name"], toAgreed=to.get("agreed"),
+                    fromUid=frm.get("uid"), fromName=frm.get("name"),
+                    carrierUid=car.get("uid"), carrierName=car.get("name"))
+
+    def get_transfer(self, order_uid):
+        with self.lock:
+            t = self.nodes.get(order_uid)
+            return self._transfer_dict(t) if t and t["_label"] == "TransferOrder" else None
+
+    def list_transfers(self, carrier_uid=None):
+        with self.lock:
+            out = [self._transfer_dict(t) for t in self.nodes.values() if t["_label"] == "TransferOrder"]
+            if carrier_uid:
+                out = [t for t in out if t["carrierUid"] == carrier_uid]
+            return sorted(out, key=lambda t: t["createdAt"], reverse=True)
+
+    def create_transfer(self, battery_id, from_uid, to_uid, props, carrier_uid=None):
+        with self.lock:
+            b = self._battery(battery_id)
+            uid = self._add("TransferOrder", new_uid("TO"), createdAt=now(), **props)
+            self.rels += [[uid, "FOR", b["uid"]], [uid, "TO", to_uid]]
+            if from_uid:
+                self.rels.append([uid, "FROM", from_uid])
+            if carrier_uid:
+                self.rels.append([uid, "ASSIGNED_TO", carrier_uid])
+            return uid
+
+    def update_transfer(self, order_uid, props, carrier_uid=None, location_uid=None):
+        """Met à jour l'ordre ; change le transporteur affecté et/ou la localisation de la batterie."""
+        with self.lock:
+            self.nodes[order_uid].update(props)
+            if carrier_uid:
+                self.rels = [r for r in self.rels if not (r[0] == order_uid and r[1] == "ASSIGNED_TO")]
+                self.rels.append([order_uid, "ASSIGNED_TO", carrier_uid])
+            if location_uid:
+                b = self._out(order_uid, "FOR")[0]
+                self.rels = [r for r in self.rels if not (r[0] == b["uid"] and r[1] == "LOCATED_AT")]
+                self.rels.append([b["uid"], "LOCATED_AT", location_uid])
+
+    def add_transfer_step(self, order_uid, actor_uid, step):
+        with self.lock:
+            uid = self._add("LogisticsStep", new_uid("STEP"), **step)
+            self.rels += [[order_uid, "HAS_STEP", uid], [actor_uid, "PERFORMED", uid]]
+            return uid
+
+    def get_transfer_steps(self, order_uid):
+        with self.lock:
+            return sorted((self._clean(s) for s in self._out(order_uid, "HAS_STEP")),
+                          key=lambda s: s["seq"])
+
+    def add_message(self, to_uid, props):
+        with self.lock:
+            uid = self._add("Message", new_uid("MSG"), read=False, at=now(), **props)
+            self.rels.append([uid, "SENT_TO", to_uid])
+            return uid
+
+    def list_messages(self, actor_uid):
+        with self.lock:
+            return sorted((self._clean(m) for m in self._in(actor_uid, "SENT_TO", "Message")),
+                          key=lambda m: m["at"], reverse=True)
+
+    def mark_messages_read(self, actor_uid):
+        with self.lock:
+            for m in self._in(actor_uid, "SENT_TO", "Message"):
+                m["read"] = True
+
+    # --- Défi 1 : télémétrie BMS -------------------------------------------------
+    def record_telemetry(self, frame, update_current=True):
+        with self.lock:
+            b = self._battery(frame["batteryId"])
+            props = dict(at=frame["at"], source=frame["source"],
+                         moduleIndexes=[m["index"] for m in frame["modules"]],
+                         resistances=[m["r"] for m in frame["modules"]])
+            if frame["modules"] and all(m["t"] is not None for m in frame["modules"]):
+                props["temperatures"] = [m["t"] for m in frame["modules"]]
+            props.update({k: frame[k] for k in ("soh", "soc") if frame[k] is not None})
+            uid = self._add("TelemetryReading", new_uid("TEL"), **props)
+            self.rels.append([b["uid"], "HAS_TELEMETRY", uid])
+            if not update_current:
+                return uid
+            by_index = {m["index"]: m for m in self._out(b["uid"], "HAS_MODULE")}
+            for m in frame["modules"]:
+                node = by_index[m["index"]]
+                node.update(internalResistance_mOhm=m["r"], measuredAt=frame["at"])
+                if m["t"] is not None:
+                    node["temperature_C"] = m["t"]
+            dp = (self._out(b["uid"], "HAS_DYNAMIC_PERFORMANCE") or [None])[0]
+            if dp is not None and (frame["soh"] is not None or frame["soc"] is not None):
+                dp.update({k: frame[k] for k in ("soh", "soc") if frame[k] is not None},
+                          measuredAt=frame["at"])
+            return uid
+
+    def get_telemetry(self, battery_id, limit=50):
+        """Relevés BMS du plus ancien au plus récent (les `limit` derniers)."""
+        with self.lock:
+            b = self._battery(battery_id)
+            if b is None:
+                return []
+            out = sorted((self._clean(r) for r in self._out(b["uid"], "HAS_TELEMETRY")),
+                         key=lambda r: r["at"])
+            return out[-limit:]
+
+    def add_event(self, battery_id, etype, actor_uid, details):
+        with self.lock:
+            self._event(self._battery(battery_id)["uid"], etype, actor_uid, details)
+
+    # --- Défi 3 : orientation de fin de vie ----------------------------------------
+    def record_orientation(self, battery_id, actor_uid, choice, recommended, comment):
+        with self.lock:
+            b = self._battery(battery_id)
+            uid = self._add("OrientationDecision", new_uid("ORI"), choice=choice,
+                            recommended=recommended, comment=comment, at=now(),
+                            decidedBy=self.nodes[actor_uid]["name"])
+            self.rels += [[b["uid"], "HAS_ORIENTATION", uid], [actor_uid, "DECIDED", uid]]
+            details = f"Orientation : {choice}" + (f" (recommandé : {recommended})"
+                                                    if choice != recommended else " (conforme à la recommandation)")
+            self._event(b["uid"], "ORIENTATION_DECIDED", actor_uid,
+                        details + (f". {comment}" if comment else ""))
+            return uid
+
+    def get_orientation(self, battery_id):
+        with self.lock:
+            b = self._battery(battery_id)
+            if b is None:
+                return None
+            ds = sorted(self._out(b["uid"], "HAS_ORIENTATION"), key=lambda d: d["at"])
+            return self._clean(ds[-1]) if ds else None
