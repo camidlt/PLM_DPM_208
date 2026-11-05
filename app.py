@@ -22,11 +22,31 @@ app.secret_key = config.SECRET_KEY
 repo = make_repo()
 
 ROLE_HOME = {"garagiste": "garage_home", "proprietaire": "owner_home", "centre_tri": "tri_home",
-             "transporteur": "transport_home"}
+             "transporteur": "transport_home", "admin": "admin_home"}
 ROLE_BATTERY = {"garagiste": "garage_battery", "proprietaire": "owner_battery",
-                "centre_tri": "tri_battery", "transporteur": "transport_battery"}
+                "centre_tri": "tri_battery", "transporteur": "transport_battery", "admin": "admin_home"}
 ROLE_LABEL = {"garagiste": "Garagiste", "proprietaire": "Propriétaire Battery Passport",
-              "centre_tri": "Centre de tri", "transporteur": "Transporteur"}
+              "centre_tri": "Centre de tri", "transporteur": "Transporteur", "admin": "Administrateur"}
+OPTION_LABELS = {
+    "Reuse": "Réutilisation",
+    "Remanufacture": "Reconditionnement",
+    "Repurpose": "Seconde vie",
+    "Recycle": "Recyclage",
+}
+STATUS_LABELS = {
+    "Original": "Origine (Original)",
+    "Waste": "Hors d'usage (Waste)",
+    "Recycled": "Recyclée (Recycled)",
+    "Repurposed": "Seconde vie (Repurposed)",
+    "SecondLife": "Seconde vie",
+    "Remanufactured": "Reconditionnée (Remanufactured)",
+    "Reused": "Réutilisée (Reused)",
+    "PENDING": "En attente",
+    "APPROVED": "Approuvée",
+    "REJECTED": "Refusée",
+    "ORDERED": "En transit",
+    "RECEIVED": "Réceptionné",
+}
 EVENT_LABEL = {"MANUFACTURED": "Fabrication", "PUT_ON_MARKET": "Mise sur le marché",
                "MAINTENANCE": "Maintenance", "FAULT_REPORTED": "Hors d'usage signalé",
                "STATUS_CHANGED": "Statut modifié", "TRANSFER_ORDERED": "Transfert ordonné",
@@ -52,7 +72,14 @@ def login_required(role=None):
             if user is None:
                 return redirect(url_for("login", next=request.full_path))
             if role and user["role"] != role:
-                flash(f"Accès réservé au rôle « {ROLE_LABEL[role]} ».", "error")
+                if session.get("is_admin"):
+                    for u_name, acc in config.ACCOUNTS.items():
+                        if acc["role"] == role:
+                            session["user"] = u_name
+                            user = current_user()
+                            break
+                    return view(user, *args, **kwargs)
+                flash(f"Accès réservé au rôle « {ROLE_LABEL.get(role, role)} ».", "error")
                 return redirect(url_for(ROLE_HOME[user["role"]]))
             return view(user, *args, **kwargs)
         return wrapper
@@ -70,6 +97,8 @@ def inject_globals():
     if user:
         unread = sum(1 for m in repo.list_messages(user["actor_uid"]) if not m.get("read"))
     return dict(user=user, role_label=ROLE_LABEL, event_label=EVENT_LABEL,
+                option_label=OPTION_LABELS, status_label=STATUS_LABELS,
+                is_admin=session.get("is_admin", False), all_accounts=config.ACCOUNTS,
                 pending_count=pending, backend=repo.backend, base_url=config.BASE_URL,
                 module_alerts=workflow.module_alerts,
                 # défi 2
@@ -84,6 +113,8 @@ def login():
         account = config.ACCOUNTS.get(username)
         if account and request.form.get("password") == account["password"]:
             session["user"] = username
+            if username == "admin":
+                session["is_admin"] = True
             nxt = request.args.get("next", "")
             if nxt.startswith("/") and not nxt.startswith("//"):
                 return redirect(nxt)
@@ -120,10 +151,19 @@ def parse_battery_code(code):
 
 
 @app.route("/b/<battery_id>")
-@login_required()
-def battery_entry(user, battery_id):
-    """Cible des QR codes : renvoie chaque rôle vers sa propre vue de la batterie."""
-    return redirect(url_for(ROLE_BATTERY[user["role"]], battery_id=battery_id))
+def battery_entry(battery_id):
+    """Cible des QR codes : renvoie chaque rôle vers sa propre vue ou la vue publique."""
+    user = current_user()
+    if user and user.get("role") in ROLE_BATTERY:
+        return redirect(url_for(ROLE_BATTERY[user["role"]], battery_id=battery_id))
+    return redirect(url_for("public_battery", battery_id=battery_id))
+
+
+@app.route("/public/b/<battery_id>")
+def public_battery(battery_id):
+    """Vue publique accessible à tous sans authentification (Annexe XIII)."""
+    p = load_passport(battery_id)
+    return render_template("public_battery.html", p=p)
 
 
 @app.route("/scan")
@@ -522,6 +562,8 @@ def api_notif_count(user):
 def admin_reset(user):
     repo.reset()
     flash("Données de démo réinitialisées.", "success")
+    if session.get("is_admin") or user["role"] == "admin":
+        return redirect(url_for("admin_home"))
     return redirect(url_for(ROLE_HOME[user["role"]]))
 
 
@@ -536,3 +578,42 @@ if __name__ == "__main__":
     print(f" * QR codes pointent vers : {config.BASE_URL}")
     app.run(host=os.environ.get("BP_HOST", "0.0.0.0"), port=int(os.environ.get("BP_PORT", 5000)),
             debug=os.environ.get("BP_DEBUG") == "1")
+
+
+# --- Administration & commutation de compte --------------------------------------
+@app.route("/admin")
+def admin_home():
+    if not session.get("is_admin"):
+        user = current_user()
+        if not user or user["role"] != "admin":
+            flash("Accès réservé à l'administrateur.", "error")
+            return redirect(url_for("login", next=request.full_path))
+    session["user"] = "admin"
+    user = current_user()
+    batteries = repo.list_batteries()
+    notifications = repo.list_notifications("EO-FLUX")
+    return render_template("admin_home.html",
+                           user=user,
+                           batteries=batteries,
+                           notifications=notifications,
+                           accounts=config.ACCOUNTS)
+
+
+@app.route("/admin/switch/<target_user>")
+def admin_switch(target_user):
+    if not session.get("is_admin"):
+        flash("Action réservée aux administrateurs.", "error")
+        return redirect(url_for("login"))
+    if target_user not in config.ACCOUNTS:
+        flash("Compte cible inconnu.", "error")
+        return redirect(url_for("admin_home"))
+    session["user"] = target_user
+    nxt = request.args.get("next")
+    if nxt and nxt.startswith("/") and not nxt.startswith("//"):
+        return redirect(nxt)
+    target_acc = config.ACCOUNTS[target_user]
+    flash(f"Compte actif : {target_acc['display']} ({ROLE_LABEL.get(target_acc['role'], target_acc['role'])}).", "info")
+    return redirect(url_for(ROLE_HOME[target_acc["role"]]))
+
+
+

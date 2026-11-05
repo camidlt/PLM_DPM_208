@@ -26,6 +26,9 @@ ACCOUNTS = {
     # Défi 2 : transporteur agréé ADR
     "transporteur": dict(password="trans123", role="transporteur", actor_uid="TR-TRANSBAT",
                          display="TransBat Logistique"),
+    # Compte administration globale (supervision & switch)
+    "admin": dict(password="admin", role="admin", actor_uid="OWNER-FLUX",
+                  operator_uid="EO-FLUX", display="Administrateur Système"),
 }
 
 # Défi 2 : notifications par mail. Sans BP_SMTP_HOST, les mails sont simulés

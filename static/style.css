@@ -490,3 +490,78 @@ dialog.doc-modal::backdrop {
 .chart .series-label.s-3 { fill: #dc2626; }
 .chart .series-label.s-4 { fill: #7c3aed; }
 .chart .series-label.s-5 { fill: #0891b2; }
+
+
+/* --- Mode Admin & Commutation --- */
+.admin-bar {
+  background: var(--navy);
+  color: #fff;
+  border-bottom: 2px solid var(--accent);
+  padding: 8px 32px;
+  font-size: .85rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  width: 100%;
+}
+.admin-bar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.admin-badge {
+  background: #f59e0b;
+  color: #1e1b4b;
+  font-weight: 800;
+  font-size: .75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.admin-lbl {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+.admin-switcher {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: .85rem;
+  cursor: pointer;
+  min-height: auto;
+  width: auto;
+}
+.admin-switcher option {
+  background: var(--navy);
+  color: #fff;
+}
+.admin-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  text-decoration: none;
+  font-size: .8rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 8px;
+  margin-left: auto;
+  transition: background .15s;
+}
+.admin-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.admin-top-pill {
+  background: #f59e0b;
+  color: #1e1b4b;
+  font-weight: 700;
+}
+.admin-hero {
+  background: linear-gradient(135deg, var(--navy) 0%, #312e81 100%);
+}

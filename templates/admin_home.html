@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord Administrateur · Battery Passport{% endblock %}
+
+
+
+{% block hero %}
+
+<div class="login-hero admin-hero">
+
+  <div class="small" style="letter-spacing:.2em;opacity:.85">MODE ADMINISTRATEUR GLOBAL</div>
+
+  <h1>Supervision & Gestion des Comptes</h1>
+
+  <p style="opacity:.9;margin:0">Basculez entre tous les comptes du système et supervisez les flux de bout en bout</p>
+
+</div>
+
+{% endblock %}
+
+
+
+{% block content %}
+
+<div class="card">
+
+  <h2>👥 Commutation rapide de compte (Impersonation)</h2>
+
+  <p class="muted small" style="margin-top:-4px;margin-bottom:14px">
+
+    Prenez l'identité de n'importe quel acteur pour tester ou opérer dans son interface dédiée sans ressaisir de mot de passe.
+
+  </p>
+
+  <div class="grid two" style="gap:12px">
+
+    {% for uname, a in accounts.items() %}
+
+      {% if uname != 'admin' %}
+
+      <div class="card" style="border:1px solid var(--line);background:var(--bg);padding:14px;margin:0;display:flex;flex-direction:column;justify-content:space-between">
+
+        <div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+
+            <span class="badge" style="background:var(--card-subtle);color:var(--ink-light);border-color:var(--line)">{{ role_label[a.role] }}</span>
+
+            <code style="font-size:.8rem;color:var(--muted)">@{{ uname }}</code>
+
+          </div>
+
+          <strong style="font-size:1.05rem;color:var(--navy)">{{ a.display }}</strong>
+
+          <div class="small muted" style="margin-top:4px">
+
+            {% if a.role == 'garagiste' %}
+
+              Diagnostic technique, scan QR code atelier, signalement hors d'usage.
+
+            {% elif a.role == 'proprietaire' %}
+
+              Gouvernance des passeports, arbitrage Original → Waste, ordre de transfert.
+
+            {% elif a.role == 'centre_tri' %}
+
+              Réception, algorithme d'orientation 4R (Réutilisation, Reconditionnement, Seconde vie, Recyclage) et catalogue de marché.
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+        <div style="margin-top:12px">
+
+          <a class="btn block" style="padding:.5rem;font-size:.9rem" href="{{ url_for('admin_switch', target_user=uname) }}">
+
+            Se connecter en tant que {{ a.display.split(' - ')[0] }} &rarr;
+
+          </a>
+
+        </div>
+
+      </div>
+
+      {% endif %}
+
+    {% endfor %}
+
+  </div>
+
+</div>
+
+
+
+<div class="card">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+
+    <div>
+
+      <h2 style="margin:0">🔋 Inventaire global des batteries ({{ batteries|length }})</h2>
+
+      <p class="muted small" style="margin:2px 0 0">Accédez directement à la vue de n'importe quelle batterie sous le rôle de votre choix.</p>
+
+    </div>
+
+  </div>
+
+
+
+  <div style="overflow-x:auto">
+
+    <table class="accounts" style="width:100%;font-size:.9rem">
+
+      <thead>
+
+        <tr>
+
+          <th>ID Batterie</th>
+
+          <th>Modèle / Chimie</th>
+
+          <th>Statut</th>
+
+          <th>SoH / SOCE</th>
+
+          <th>Localisation</th>
+
+          <th>Accès par rôle métier</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {% for b in batteries %}
+
+        <tr>
+
+          <td><strong style="color:var(--navy)">{{ b.batteryId }}</strong></td>
+
+          <td>
+
+            {{ b.model or 'Modèle standard' }}
+
+            {% if b.chemistry %}<span class="chip" style="font-size:.7rem;padding:.1rem .4rem">{{ b.chemistry }}</span>{% endif %}
+
+          </td>
+
+          <td>
+
+            <span class="badge st-{{ b.status }}">{{ status_label.get(b.status, b.status) if status_label else b.status }}</span>
+
+          </td>
+
+          <td>
+
+            {% if b.soh is not none %}{{ b.soh }}%{% else %}—{% endif %}
+
+            {% if b.soce is not none %}<span class="muted" style="font-size:.8rem">({{ b.soce }}%)</span>{% endif %}
+
+          </td>
+
+          <td class="small">{{ b.location_name or b.location or 'Non assigné' }}</td>
+
+          <td>
+
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+
+              <a class="btn ghost small" style="padding:.25rem .5rem;min-height:unset;font-size:.75rem"
+
+                 title="Ouvrir dans l'interface Garagiste"
+
+                 href="{{ url_for('admin_switch', target_user='garagiste', next=url_for('garage_battery', battery_id=b.batteryId)) }}">
+
+                🚗 Garage
+
+              </a>
+
+              <a class="btn ghost small" style="padding:.25rem .5rem;min-height:unset;font-size:.75rem"
+
+                 title="Ouvrir dans l'interface Propriétaire"
+
+                 href="{{ url_for('admin_switch', target_user='proprietaire', next=url_for('owner_battery', battery_id=b.batteryId)) }}">
+
+                🏢 Propriétaire
+
+              </a>
+
+              <a class="btn ghost small" style="padding:.25rem .5rem;min-height:unset;font-size:.75rem"
+
+                 title="Ouvrir dans l'interface Centre de tri"
+
+                 href="{{ url_for('admin_switch', target_user='centretri', next=url_for('tri_battery', battery_id=b.batteryId)) }}">
+
+                ♻️ Tri
+
+              </a>
+
+              <a class="btn ghost small" style="padding:.25rem .5rem;min-height:unset;font-size:.75rem"
+
+                 title="Vue publique réglementaire (Annexe XIII)"
+
+                 href="{{ url_for('public_battery', battery_id=b.batteryId) }}" target="_blank">
+
+                🌐 Public
+
+              </a>
+
+            </div>
+
+          </td>
+
+        </tr>
+
+        {% endfor %}
+
+      </tbody>
+
+    </table>
+
+  </div>
+
+</div>
+
+
+
+<div class="grid two">
+
+  <div class="card">
+
+    <h3>📢 Notifications & Flux d'arbitrage</h3>
+
+    <p class="small muted">Demandes en attente d'approbation ou de rejet par le propriétaire :</p>
+
+    {% if notifications %}
+
+      <ul style="padding-left:18px;margin:0;font-size:.85rem">
+
+        {% for n in notifications[:5] %}
+
+          <li style="margin-bottom:6px">
+
+            <strong>{{ n.batteryId }}</strong> — {{ n.type }}
+
+            <span class="badge st-{{ n.state }}" style="font-size:.7rem">{{ n.state }}</span>
+
+          </li>
+
+        {% endfor %}
+
+      </ul>
+
+      {% if notifications|length > 5 %}
+
+        <div class="small muted" style="margin-top:6px">+ {{ notifications|length - 5 }} autre(s)</div>
+
+      {% endif %}
+
+    {% else %}
+
+      <p class="muted small" style="margin:0">Aucune notification en cours.</p>
+
+    {% endif %}
+
+  </div>
+
+
+
+  <div class="card">
+
+    <h3>⚙️ Système & Démonstration</h3>
+
+    <p class="small muted">Gestion de la base de données et des raccourcis globaux :</p>
+
+    <div style="display:flex;gap:8px;flex-direction:column">
+
+      <form method="post" action="{{ url_for('admin_reset') }}"
+
+            onsubmit="return confirm('Réinitialiser toutes les données de démo ? Cette action remet à zéro l\'état des batteries et transferts.')">
+
+        <button class="btn danger block" type="submit" style="font-size:.85rem;min-height:38px;padding:.5rem">
+
+          🔄 Réinitialiser les données de démo
+
+        </button>
+
+      </form>
+
+      <a class="btn ghost block" href="{{ url_for('admin_switch', target_user='centretri', next=url_for('tri_home')) }}" style="font-size:.85rem;min-height:38px;padding:.5rem">
+
+        🏭 Accéder à l'espace Centre de tri
+
+      </a>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+
+
