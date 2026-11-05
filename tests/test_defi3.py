@@ -12,11 +12,10 @@ from bp import decision
 
 TODAY = date(2026, 11, 4)
 EXPECTED = {
-    "BAT-101": "Reuse",
+    "BAT-002": "Reuse",
     "BAT-DOC-001": "Remanufacture",
-    "BAT-102": "Repurpose",
-    "BAT-103": "Recycle",
-    "BAT-004": "Recycle"
+    "BAT-003": "Repurpose",
+    "BAT-004": "Recycle",
 }
 
 
@@ -25,114 +24,125 @@ def _reset():
     repo.reset()
 
 
+def _reco(bid):
+    p = repo.get_passport(bid)
+    return decision.recommend(p, repo.get_history(bid), repo.get_telemetry(bid))
+
+
 def test_algorithme_5_cas_direct():
-    demands = repo.list_demands()
+    """Vérifie la recommandation directe pour chaque profil de batterie de démo."""
     for bid, expected in EXPECTED.items():
         p = repo.get_passport(bid)
         assert p is not None, f"{bid} introuvable"
-        res = decision.recommend(p, demands, today=TODAY)
-        assert res["recommendation"] == expected, f"Attendu {expected} pour {bid}, obtenu {res['recommendation']}"
+        res = _reco(bid)
+        reco = res.get("recommended") or res.get("recommendation")
+        assert reco == expected, f"Attendu {expected} pour {bid}, obtenu {reco}"
+        # Le recyclage est toujours présent et éligible comme solution de repli
+        recycle_opt = next(o for o in res["options"] if o["key"] == "Recycle")
+        assert recycle_opt["eligible"] is True
 
 
 def test_regle_securite():
-    demands = repo.list_demands()
-    p = repo.get_passport("BAT-103")
-    res = decision.recommend(p, demands, today=TODAY)
-    feasible = [o["option"] for o in res["options"] if o["feasible"]]
-    assert feasible == ["Recycle"]
+    """Une batterie avec défaut de sécurité (gonflement, surchauffe, accidents) exclut le réemploi."""
+    # BAT-004 a 2 accidents : seul Recycle doit être éligible
+    p_004 = repo.get_passport("BAT-004")
+    res_004 = decision.recommend(p_004, repo.get_history("BAT-004"))
+    eligible_004 = [o["key"] for o in res_004["options"] if o["eligible"]]
+    assert eligible_004 == ["Recycle"]
+
+    # BAT-002 (normalement Reuse) avec un défaut de sécurité signalé bascule immédiatement en Recycle
+    p_002 = repo.get_passport("BAT-002")
+    history_fault = [{"type": "FAULT_REPORTED", "details": "Dommage physique / gonflement"}]
+    res_fault = decision.recommend(p_002, history_fault)
+    eligible_fault = [o["key"] for o in res_fault["options"] if o["eligible"]]
+    assert eligible_fault == ["Recycle"]
+    assert res_fault["recommended"] == "Recycle"
 
 
 def test_bascule_marche():
-    p = repo.get_passport("BAT-DOC-001")
-    demands = repo.list_demands()
-    res1 = decision.recommend(p, demands, today=TODAY)
-    assert res1["recommendation"] == "Remanufacture"
+    """Vérifie la bascule de recommandation selon l'état des modules et la dérive BMS."""
+    # BAT-DOC-001 avec son module défaillant est en Remanufacture
+    p_doc = repo.get_passport("BAT-DOC-001")
+    res_doc = decision.recommend(p_doc, repo.get_history("BAT-DOC-001"), repo.get_telemetry("BAT-DOC-001"))
+    assert res_doc["recommended"] == "Remanufacture"
 
-    demands_vtt = [dict(d, active=(True if d["uid"] == "DEM-VTT" else d["active"])) for d in demands]
-    res2 = decision.recommend(p, demands_vtt, today=TODAY)
-    assert res2["recommendation"] == "Repurpose"
-    assert res2["market_driven"] is True
+    # BAT-002 (SOH 93%) est en Reuse
+    p_002 = repo.get_passport("BAT-002")
+    res_002 = decision.recommend(p_002)
+    assert res_002["recommended"] == "Reuse"
 
-    res3 = decision.recommend(p, demands_vtt, weights={"marche": 0.0}, today=TODAY)
-    assert res3["recommendation"] == "Remanufacture"
+    # Si la télémétrie BMS montre une forte dérive de résistance (+80%), Reuse est exclu
+    drift_readings = [
+        dict(at="2026-01-01T00:00:00", moduleIndexes=[1], resistances=[1.0]),
+        dict(at="2026-06-01T00:00:00", moduleIndexes=[1], resistances=[1.8]),
+    ]
+    res_drift = decision.recommend(p_002, history=(), readings=drift_readings)
+    assert res_drift["recommended"] != "Reuse"
+    reuse_opt = next(o for o in res_drift["options"] if o["key"] == "Reuse")
+    assert any("Dérive" in c["label"] and not c["ok"] for c in reuse_opt["criteria"])
 
 
 def test_priorites_du_centre():
-    p = repo.get_passport("BAT-101")
-    demands_vtt = [dict(d, active=(True if d["uid"] == "DEM-VTT" else d["active"])) for d in repo.list_demands()]
-    # Avec marché actif et VTT, BAT-101 est Repurpose
-    assert decision.recommend(p, demands_vtt, today=TODAY)["recommendation"] == "Repurpose"
-    # Si le centre ignore le marché, retour à son optimum (Reuse)
-    r_no_mkt = decision.recommend(p, demands_vtt, params={"use_market": False}, today=TODAY)
-    assert r_no_mkt["recommendation"] == "Reuse" and not r_no_mkt["market_driven"]
-    # Si le centre désactive la hiérarchie circulaire
-    r_no_hier = decision.recommend(p, demands_vtt, params={"use_hierarchy": False}, today=TODAY)
-    assert all(o["hierarchy"] == 0 for o in r_no_hier["options"])
+    """Vérifie le respect de la hiérarchie européenne des déchets (Reuse > Remanufacture > Repurpose > Recycle)."""
+    # 1. Reuse si tous les critères sont au vert
+    res_002 = _reco("BAT-002")
+    assert res_002["recommended"] == "Reuse"
+
+    # 2. Si Reuse impossible mais modules remplaçables -> Remanufacture
+    res_doc = _reco("BAT-DOC-001")
+    assert res_doc["recommended"] == "Remanufacture"
+    assert not next(o for o in res_doc["options"] if o["key"] == "Reuse")["eligible"]
+    assert next(o for o in res_doc["options"] if o["key"] == "Remanufacture")["eligible"]
+
+    # 3. Si Remanufacture non pertinente (pas de module seul défaillant) mais bon SOH LFP -> Repurpose
+    res_003 = _reco("BAT-003")
+    assert res_003["recommended"] == "Repurpose"
+    assert not next(o for o in res_003["options"] if o["key"] == "Reuse")["eligible"]
+    assert not next(o for o in res_003["options"] if o["key"] == "Remanufacture")["eligible"]
+    assert next(o for o in res_003["options"] if o["key"] == "Repurpose")["eligible"]
+
+    # 4. Repli final : Recycle
+    res_004 = _reco("BAT-004")
+    assert res_004["recommended"] == "Recycle"
 
 
 def test_tri_integration_web_et_onglets():
+    """Intégration Web centre de tri : consultation, API décision et enregistrement de l'orientation."""
     client = app.test_client()
 
-    # Login centre de tri
-    res = client.post("/login", data={"username": "centretri", "password": "tri123"}, follow_redirects=True)
-    assert res.status_code == 200
+    # Login centre de tri Recyclo Nanterre
+    res_login = client.post("/login", data={"username": "centretri", "password": "tri123"}, follow_redirects=True)
+    assert res_login.status_code == 200
 
-    # Consultation de BAT-101 (Waste, situé à CT-NANTERRE)
-    res_b = client.get("/tri/b/BAT-101")
+    # Consultation de BAT-004 (Waste, réceptionnée à CT-NANTERRE)
+    res_b = client.get("/tri/b/BAT-004")
     assert res_b.status_code == 200
-    assert b"Aide" in res_b.data or b"Recommandation" in res_b.data
-    assert b"Reuse" in res_b.data
+    assert b"Recommandation" in res_b.data
+    assert b"Recyclage" in res_b.data
 
-    # Toggle marché VTT depuis la page avec redirection
-    res_toggle = client.post("/tri/market/DEM-VTT/toggle", data={"back": "/tri/b/BAT-101?tab=marche#decision"}, follow_redirects=True)
-    assert res_toggle.status_code == 200
-    demands_dict = {d["uid"]: d for d in repo.list_demands()}
-    assert demands_dict["DEM-VTT"]["active"] is True
+    # API JSON décision
+    res_api = client.get("/api/battery/BAT-004/decision")
+    assert res_api.status_code == 200
+    d_json = res_api.json
+    assert d_json["recommendation"]["recommended"] == "Recycle"
 
-    # Toggle priorité centre de tri
-    res_prio = client.post("/tri/priorities", data={"toggle": "use_market", "back": "/tri/b/BAT-101?tab=priorites#decision"}, follow_redirects=True)
-    assert res_prio.status_code == 200
-    pol = repo.get_center_policy("CT-NANTERRE")
-    assert pol["use_market"] is False
+    # Tentative de choisir une option inéligible (Reuse pour BAT-004) -> refusé
+    res_reuse = client.post("/tri/b/BAT-004/orientation", data={"choice": "Reuse"}, follow_redirects=True)
+    assert "pas possible" in res_reuse.get_data(as_text=True)
 
-    # Enregistrement de la décision pour BAT-101 (Reuse)
-    res_dec = client.post("/tri/b/BAT-101/decision", data={
-        "chosen": "Reuse",
-        "comment": "Validation test intégration"
+    # Enregistrement de l'orientation conforme (Recycle)
+    res_dec = client.post("/tri/b/BAT-004/orientation", data={
+        "choice": "Recycle",
+        "comment": "Validation test intégration filière hydrométallurgie"
     }, follow_redirects=True)
     assert res_dec.status_code == 200
+    assert "Orientation enregistrée" in res_dec.get_data(as_text=True)
 
-    # Vérification que la décision et l'événement sont dans le graphe
-    decs = repo.get_decisions("BAT-101")
-    assert len(decs) >= 1
-    assert decs[0]["chosen"] == "Reuse"
+    # Vérification que l'orientation et l'événement sont enregistrés dans le repo
+    orientation = repo.get_orientation("BAT-004")
+    assert orientation is not None
+    assert orientation["choice"] == "Recycle"
+    assert orientation["recommended"] == "Recycle"
 
-    events = [e for e in repo.get_history("BAT-101") if e["type"] == "DECISION_RECORDED"]
+    events = [e for e in repo.get_history("BAT-004") if e["type"] == "ORIENTATION_DECIDED"]
     assert len(events) >= 1
-
-    # Ajout d'une nouvelle demande sur le marché
-    res_add = client.post("/tri/market/add", data={
-        "title": "Karts électriques pour circuit de loisir",
-        "option": "Repurpose",
-        "partner": "Karting Circuit SAS",
-        "urgency": "urgente",
-        "min_soce": "65",
-        "quantity": "15",
-        "location": "Paris",
-        "chemistries": ["NMC 811"],
-        "back": "/tri/b/BAT-101?tab=marche#decision"
-    }, follow_redirects=True)
-    assert res_add.status_code == 200
-    demands_after_add = repo.list_demands()
-    added = [d for d in demands_after_add if d["title"] == "Karts électriques pour circuit de loisir"]
-    assert len(added) == 1
-    new_uid = added[0]["uid"]
-    assert added[0]["urgency"] == "urgente"
-
-    # Retrait / suppression de cette demande
-    res_del = client.post(f"/tri/market/{new_uid}/delete", data={
-        "back": "/tri/b/BAT-101?tab=marche#decision"
-    }, follow_redirects=True)
-    assert res_del.status_code == 200
-    demands_after_del = repo.list_demands()
-    assert all(d["uid"] != new_uid for d in demands_after_del)
