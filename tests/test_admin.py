@@ -42,6 +42,13 @@ def test_admin_login(client):
     assert "account-role-filter" in html
     assert "account-battery-filter" in html
     assert "battery-search-input" in html
+    # Vérification des tableaux alignés et des 4 onglets de batteries
+    assert "accounts-table" in html
+    assert "batteries-table" in html
+    assert "subtab-btn-healthy" in html
+    assert "subtab-btn-damaged" in html
+    assert "subtab-btn-transit" in html
+    assert "subtab-btn-tri" in html
 
 
 def test_admin_switch_account(client):

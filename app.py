@@ -582,8 +582,62 @@ def admin_home():
             return redirect(url_for("login", next=request.full_path))
     session["user"] = "admin"
     user = current_user()
-    batteries = repo.list_batteries()
+    batteries_raw = repo.list_batteries()
     notifications = repo.list_notifications("EO-FLUX")
+
+    # Enrichir les batteries avec leur classification dans les 4 onglets
+    batteries = []
+    count_healthy = 0
+    count_damaged = 0
+    count_transit = 0
+    count_tri = 0
+
+    for b in batteries_raw:
+        bid = b["batteryId"]
+        p = repo.get_passport(bid)
+        alerts = workflow.module_alerts(p) if p else []
+        notifs = [n for n in notifications if n.get("batteryId") == bid]
+        transfer = (p.get("transfer") if p else None)
+        status = b.get("status", "Original")
+        loc = (b.get("location") or "").lower()
+
+        # Onglet 4 : Dans les centres de tri
+        is_tri = ("centre" in loc or "tri" in loc or "recyclo" in loc or "rhône" in loc or "rhone" in loc or
+                  (transfer and transfer.get("state") == "RECEIVED") or
+                  status in ("Reused", "Remanufactured", "Repurposed", "Recycled"))
+
+        # Onglet 3 : En transit de transport
+        is_transit = ((transfer and transfer.get("state") in ("ORDERED", "SCHEDULED", "PICKED_UP", "IN_TRANSIT")) or
+                      "transport" in loc or "transbat" in loc)
+
+        # Onglet 2 : Casse ou avarie déclarée
+        is_damaged = (bool(alerts) or any(n.get("state") == "PENDING" for n in notifs) or
+                      status == "Waste" or
+                      any(e.get("type") == "DAMAGED_REPORTED" for e in repo.get_history(bid)))
+
+        # Onglet 1 : En forme
+        is_healthy = (status == "Original" and not is_damaged and not is_transit and not is_tri)
+
+        if is_healthy: count_healthy += 1
+        if is_damaged: count_damaged += 1
+        if is_transit: count_transit += 1
+        if is_tri: count_tri += 1
+
+        batteries.append(dict(
+            batteryId=bid,
+            status=status,
+            model=b.get("model") or "FluxCap 85 kWh",
+            chemistry=(p.get("composition") or {}).get("batteryChemistry", "NMC") if p else "NMC",
+            soh=b.get("soh", 0),
+            location=b.get("location") or "Non assigné",
+            alerts_count=len(alerts),
+            alerts=alerts,
+            transfer=transfer,
+            is_healthy=is_healthy,
+            is_damaged=is_damaged,
+            is_transit=is_transit,
+            is_tri=is_tri
+        ))
 
     # Enrichir les comptes avec les batteries détenues/associées
     accounts_list = []
@@ -596,6 +650,8 @@ def admin_home():
             elif acc["role"] == "centre_tri" and ("centre" in loc or "tri" in loc or "recyclo" in loc or "rhône" in loc or "rhone" in loc):
                 held.append(b["batteryId"])
             elif acc["role"] == "proprietaire":
+                held.append(b["batteryId"])
+            elif acc["role"] == "transporteur" and b.get("is_transit"):
                 held.append(b["batteryId"])
         accounts_list.append(dict(
             username=uname,
@@ -610,6 +666,10 @@ def admin_home():
     return render_template("admin_home.html",
                            user=user,
                            batteries=batteries,
+                           count_healthy=count_healthy,
+                           count_damaged=count_damaged,
+                           count_transit=count_transit,
+                           count_tri=count_tri,
                            notifications=notifications,
                            accounts=config.ACCOUNTS,
                            accounts_list=accounts_list,

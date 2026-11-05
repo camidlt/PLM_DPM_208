@@ -693,3 +693,81 @@ dialog.doc-modal::backdrop {
   padding: 14px;
   margin-top: 10px;
 }
+
+
+/* --- Tableaux alignés Admin & 4 Onglets Batteries --- */
+.admin-table-container {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .88rem;
+  text-align: left;
+}
+.admin-table th {
+  background: var(--card-subtle);
+  padding: 12px 14px;
+  font-weight: 700;
+  color: var(--navy);
+  border-bottom: 2px solid var(--line);
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+.admin-table tr:hover td {
+  background: rgba(30, 27, 75, 0.02);
+}
+
+.battery-subtabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.battery-subtab-btn {
+  background: var(--card-subtle);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.battery-subtab-btn:hover {
+  background: #fff;
+  color: var(--navy);
+  border-color: var(--navy);
+}
+.battery-subtab-btn.active {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+.battery-subtab-btn .tab-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+  font-size: .75rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.battery-subtab-btn:not(.active) .tab-count {
+  background: var(--line);
+  color: var(--ink);
+}
