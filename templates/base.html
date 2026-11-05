@@ -7,6 +7,25 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+  {% if is_admin %}
+  <div class="admin-bar">
+    <div class="admin-bar-inner">
+      <span class="admin-badge">👑 Mode Admin</span>
+      <span class="admin-lbl">Compte actif :</span>
+      <select onchange="window.location.href='/admin/switch/' + encodeURIComponent(this.value)" class="admin-switcher" title="Changer de compte instantanément">
+        {% for uname, a in all_accounts.items() %}
+          <option value="{{ uname }}" {% if user and user.username == uname %}selected{% endif %}>
+            {{ role_label.get(a.role, a.role) }} — {{ a.display }}
+          </option>
+        {% endfor %}
+      </select>
+      {% if user and user.username != 'admin' %}
+        <a class="admin-btn" href="{{ url_for('admin_home') }}">⚙️ Tableau de bord Admin</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {% if user %}
   <header class="topbar">
     <a class="brand" href="{{ url_for('index') }}">Battery<span>Passport</span></a>
@@ -18,6 +37,11 @@
     {% endif %}
     <a class="bell" href="{{ url_for('messages') }}" title="Messages">✉️
       <span class="count" data-n="{{ unread_count }}">{{ unread_count }}</span></a>
+    {% if is_admin and user.username != 'admin' %}
+      <a class="chip admin-top-pill" href="{{ url_for('admin_home') }}" title="Retourner au panneau admin">Mode Admin ⚙️</a>
+    {% endif %}
+
+
     <span class="small who" style="opacity:.8">{{ user.display }}</span>
     <a class="link" href="{{ url_for('logout') }}">Déconnexion</a>
   </header>

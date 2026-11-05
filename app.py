@@ -22,11 +22,31 @@ app.secret_key = config.SECRET_KEY
 repo = make_repo()
 
 ROLE_HOME = {"garagiste": "garage_home", "proprietaire": "owner_home", "centre_tri": "tri_home",
-             "transporteur": "transport_home"}
+             "transporteur": "transport_home", "admin": "admin_home"}
 ROLE_BATTERY = {"garagiste": "garage_battery", "proprietaire": "owner_battery",
-                "centre_tri": "tri_battery", "transporteur": "transport_battery"}
+                "centre_tri": "tri_battery", "transporteur": "transport_battery", "admin": "admin_home"}
 ROLE_LABEL = {"garagiste": "Garagiste", "proprietaire": "Propriétaire Battery Passport",
-              "centre_tri": "Centre de tri", "transporteur": "Transporteur"}
+              "centre_tri": "Centre de tri", "transporteur": "Transporteur", "admin": "Administrateur"}
+OPTION_LABELS = {
+    "Reuse": "Réutilisation",
+    "Remanufacture": "Reconditionnement",
+    "Repurpose": "Seconde vie",
+    "Recycle": "Recyclage",
+}
+STATUS_LABELS = {
+    "Original": "Origine (Original)",
+    "Waste": "Hors d'usage (Waste)",
+    "Recycled": "Recyclée (Recycled)",
+    "Repurposed": "Seconde vie (Repurposed)",
+    "SecondLife": "Seconde vie",
+    "Remanufactured": "Reconditionnée (Remanufactured)",
+    "Reused": "Réutilisée (Reused)",
+    "PENDING": "En attente",
+    "APPROVED": "Approuvée",
+    "REJECTED": "Refusée",
+    "ORDERED": "En transit",
+    "RECEIVED": "Réceptionné",
+}
 EVENT_LABEL = {"MANUFACTURED": "Fabrication", "PUT_ON_MARKET": "Mise sur le marché",
                "MAINTENANCE": "Maintenance", "FAULT_REPORTED": "Hors d'usage signalé",
                "STATUS_CHANGED": "Statut modifié", "TRANSFER_ORDERED": "Transfert ordonné",
@@ -52,7 +72,14 @@ def login_required(role=None):
             if user is None:
                 return redirect(url_for("login", next=request.full_path))
             if role and user["role"] != role:
-                flash(f"Accès réservé au rôle « {ROLE_LABEL[role]} ».", "error")
+                if session.get("is_admin"):
+                    for u_name, acc in config.ACCOUNTS.items():
+                        if acc["role"] == role:
+                            session["user"] = u_name
+                            user = current_user()
+                            break
+                    return view(user, *args, **kwargs)
+                flash(f"Accès réservé au rôle « {ROLE_LABEL.get(role, role)} ».", "error")
                 return redirect(url_for(ROLE_HOME[user["role"]]))
             return view(user, *args, **kwargs)
         return wrapper
@@ -70,6 +97,8 @@ def inject_globals():
     if user:
         unread = sum(1 for m in repo.list_messages(user["actor_uid"]) if not m.get("read"))
     return dict(user=user, role_label=ROLE_LABEL, event_label=EVENT_LABEL,
+                option_label=OPTION_LABELS, status_label=STATUS_LABELS,
+                is_admin=session.get("is_admin", False), all_accounts=config.ACCOUNTS,
                 pending_count=pending, backend=repo.backend, base_url=config.BASE_URL,
                 module_alerts=workflow.module_alerts,
                 # défi 2
@@ -84,6 +113,8 @@ def login():
         account = config.ACCOUNTS.get(username)
         if account and request.form.get("password") == account["password"]:
             session["user"] = username
+            if username == "admin":
+                session["is_admin"] = True
             nxt = request.args.get("next", "")
             if nxt.startswith("/") and not nxt.startswith("//"):
                 return redirect(nxt)
@@ -126,12 +157,21 @@ def parse_battery_code(code):
 
 
 @app.route("/b/<battery_id>")
-@login_required()
-def battery_entry(user, battery_id):
-    """Cible des QR codes : renvoie chaque rôle vers sa propre vue de la batterie."""
+def battery_entry(battery_id):
+    """Cible des QR codes : renvoie chaque rôle vers sa propre vue ou la vue publique."""
     if battery_id and battery_id.upper() in ("DLR-1985", "DLR1985", "DELOREAN"):
         battery_id = "BAT-DOC-001"
-    return redirect(url_for(ROLE_BATTERY[user["role"]], battery_id=battery_id))
+    user = current_user()
+    if user and user.get("role") in ROLE_BATTERY:
+        return redirect(url_for(ROLE_BATTERY[user["role"]], battery_id=battery_id))
+    return redirect(url_for("public_battery", battery_id=battery_id))
+
+
+@app.route("/public/b/<battery_id>")
+def public_battery(battery_id):
+    """Vue publique accessible à tous sans authentification (Annexe XIII)."""
+    p = load_passport(battery_id)
+    return render_template("public_battery.html", p=p)
 
 
 @app.route("/scan")
@@ -541,12 +581,239 @@ def api_notif_count(user):
 def admin_reset(user):
     repo.reset()
     flash("Données de démo réinitialisées.", "success")
+    if session.get("is_admin") or user["role"] == "admin":
+        return redirect(url_for("admin_home"))
     return redirect(url_for(ROLE_HOME[user["role"]]))
 
 
 @app.errorhandler(404)
 def not_found(_):
     return render_template("error.html", message="Batterie ou page introuvable."), 404
+
+
+# --- Administration & commutation de compte --------------------------------------
+@app.route("/admin")
+def admin_home():
+    if not session.get("is_admin"):
+        user = current_user()
+        if not user or user["role"] != "admin":
+            flash("Accès réservé à l'administrateur.", "error")
+            return redirect(url_for("login", next=request.full_path))
+    session["user"] = "admin"
+    user = current_user()
+    batteries_raw = repo.list_batteries()
+    notifications = repo.list_notifications("EO-FLUX")
+
+    # Enrichir les batteries avec leur classification dans les 4 onglets
+    batteries = []
+    count_healthy = 0
+    count_damaged = 0
+    count_transit = 0
+    count_tri = 0
+
+    for b in batteries_raw:
+        bid = b["batteryId"]
+        p = repo.get_passport(bid)
+        alerts = workflow.module_alerts(p) if p else []
+        notifs = [n for n in notifications if n.get("batteryId") == bid]
+        transfer = (p.get("transfer") if p else None)
+        status = b.get("status", "Original")
+        loc = (b.get("location") or "").lower()
+
+        # Onglet 4 : Dans les centres de tri
+        is_tri = ("centre" in loc or "tri" in loc or "recyclo" in loc or "rhône" in loc or "rhone" in loc or
+                  (transfer and transfer.get("state") == "RECEIVED") or
+                  status in ("Reused", "Remanufactured", "Repurposed", "Recycled"))
+
+        # Onglet 3 : En transit de transport
+        is_transit = ((transfer and transfer.get("state") in ("ORDERED", "SCHEDULED", "PICKED_UP", "IN_TRANSIT")) or
+                      "transport" in loc or "transbat" in loc)
+
+        # Onglet 2 : Casse ou avarie déclarée
+        is_damaged = (bool(alerts) or any(n.get("state") == "PENDING" for n in notifs) or
+                      status == "Waste" or
+                      any(e.get("type") == "DAMAGED_REPORTED" for e in repo.get_history(bid)))
+
+        # Onglet 1 : En forme
+        is_healthy = (status == "Original" and not is_damaged and not is_transit and not is_tri)
+
+        if is_healthy: count_healthy += 1
+        if is_damaged: count_damaged += 1
+        if is_transit: count_transit += 1
+        if is_tri: count_tri += 1
+
+        batteries.append(dict(
+            batteryId=bid,
+            status=status,
+            model=b.get("model") or "FluxCap 85 kWh",
+            chemistry=(p.get("composition") or {}).get("batteryChemistry", "NMC") if p else "NMC",
+            soh=b.get("soh", 0),
+            location=b.get("location") or "Non assigné",
+            alerts_count=len(alerts),
+            alerts=alerts,
+            transfer=transfer,
+            is_healthy=is_healthy,
+            is_damaged=is_damaged,
+            is_transit=is_transit,
+            is_tri=is_tri
+        ))
+
+    # Enrichir les comptes avec les batteries détenues/associées
+    accounts_list = []
+    for uname, acc in config.ACCOUNTS.items():
+        held = []
+        for b in batteries:
+            loc = (b.get("location") or "").lower()
+            if acc["role"] == "garagiste" and "garage" in loc:
+                held.append(b["batteryId"])
+            elif acc["role"] == "centre_tri" and ("centre" in loc or "tri" in loc or "recyclo" in loc or "rhône" in loc or "rhone" in loc):
+                held.append(b["batteryId"])
+            elif acc["role"] == "proprietaire":
+                held.append(b["batteryId"])
+            elif acc["role"] == "transporteur" and b.get("is_transit"):
+                held.append(b["batteryId"])
+        accounts_list.append(dict(
+            username=uname,
+            role=acc["role"],
+            role_label=ROLE_LABEL.get(acc["role"], acc["role"]),
+            display=acc["display"],
+            actor_uid=acc.get("actor_uid", ""),
+            operator_uid=acc.get("operator_uid", ""),
+            held_batteries=held
+        ))
+
+    return render_template("admin_home.html",
+                           user=user,
+                           batteries=batteries,
+                           count_healthy=count_healthy,
+                           count_damaged=count_damaged,
+                           count_transit=count_transit,
+                           count_tri=count_tri,
+                           notifications=notifications,
+                           accounts=config.ACCOUNTS,
+                           accounts_list=accounts_list,
+                           fault_types=workflow.FAULT_TYPES,
+                           statuses=workflow.STATUSES,
+                           destinations=repo.list_actors("centre_tri"))
+
+
+@app.route("/admin/switch/<target_user>")
+def admin_switch(target_user):
+    if not session.get("is_admin"):
+        flash("Action réservée aux administrateurs.", "error")
+        return redirect(url_for("login"))
+    if target_user not in config.ACCOUNTS:
+        flash("Compte cible inconnu.", "error")
+        return redirect(url_for("admin_home"))
+    session["user"] = target_user
+    nxt = request.args.get("next")
+    if nxt and nxt.startswith("/") and not nxt.startswith("//"):
+        return redirect(nxt)
+    target_acc = config.ACCOUNTS[target_user]
+    flash(f"Compte actif : {target_acc['display']} ({ROLE_LABEL.get(target_acc['role'], target_acc['role'])}).", "info")
+    return redirect(url_for(ROLE_HOME[target_acc["role"]]))
+
+
+@app.route("/admin/battery/<battery_id>/status", methods=["POST"])
+def admin_battery_status(battery_id):
+    if not session.get("is_admin"):
+        user = current_user()
+        if not user or user["role"] != "admin":
+            flash("Action réservée aux administrateurs.", "error")
+            return redirect(url_for("login"))
+    new_status = request.form.get("status", "").strip()
+    comment = request.form.get("comment", "").strip()
+    if not new_status:
+        flash("Veuillez sélectionner un statut valide.", "error")
+        return redirect(url_for("admin_home") + "#batteries")
+
+    old_status = repo.set_battery_status(
+        battery_id,
+        new_status,
+        actor_uid="OWNER-FLUX",
+        details=f"Statut modifié par l'administrateur : {new_status}" + (f" ({comment})" if comment else "")
+    )
+    flash(f"Statut de la batterie {battery_id} mis à jour : {old_status} → {new_status}.", "success")
+    return redirect(url_for("admin_home") + "#batteries")
+
+
+@app.route("/admin/battery/<battery_id>/incident", methods=["POST"])
+def admin_battery_incident(battery_id):
+    if not session.get("is_admin"):
+        user = current_user()
+        if not user or user["role"] != "admin":
+            flash("Action réservée aux administrateurs.", "error")
+            return redirect(url_for("login"))
+    fault_type = request.form.get("fault_type", "").strip() or "Autre avarie constatée"
+    comment = request.form.get("comment", "").strip()
+    mode = request.form.get("mode", "direct_waste")
+    destination_uid = request.form.get("destination", "CT-NANTERRE")
+    auto_logistics = bool(request.form.get("auto_logistics"))
+    pickup_date = request.form.get("pickup_date", "") or date.today().isoformat()
+    pickup_slot = request.form.get("pickup_slot", "8h-12h")
+
+    p = repo.get_passport(battery_id)
+    if not p:
+        flash("Batterie introuvable.", "error")
+        return redirect(url_for("admin_home") + "#batteries")
+
+    admin_user = dict(username="admin", role="admin", actor_uid="OWNER-FLUX", display="Administrateur Système")
+
+    if mode == "direct_waste":
+        repo.set_battery_status(
+            battery_id,
+            "Waste",
+            actor_uid="OWNER-FLUX",
+            details=f"Déclaration de casse directe par l'admin : {fault_type}. {comment}".strip()
+        )
+        repo.add_event(
+            battery_id,
+            "DAMAGED_REPORTED",
+            "OWNER-FLUX",
+            f"Défaut : {fault_type}. {comment}".strip()
+        )
+        dest = repo.get_actor(destination_uid)
+        dest_name = dest["name"] if dest else destination_uid
+        try:
+            loc_uid = (p.get("location") or {}).get("uid") or "GARAGE-HV"
+            props = dict(
+                state="ORDERED",
+                damageClass=logistics.damage_class(fault_type),
+                wasteCode="16 01 21*",
+                unDesignation="UN 3480 Batteries au lithium-ion, classe 9",
+                adrProvision="SP 376 (batterie endommagée)",
+                adrPacking="P908 / LP904 (emballage de sécurité)",
+                adrMarking="Étiquette Classe 9 + Mention BATTERIES ENDOMMAGÉES",
+                declaredWeightKg=int((p.get("battery") or {}).get("weightKg") or 450),
+                ownerComment=f"Déclaration de casse administrative : {fault_type}. {comment}".strip()
+            )
+            order_uid = repo.create_transfer(battery_id, loc_uid, destination_uid, props)
+            repo.add_event(battery_id, "TRANSFER_ORDERED", "OWNER-FLUX",
+                           f"Transfert direct vers {dest_name} ({order_uid})")
+
+            if auto_logistics:
+                carriers = [c for c in repo.list_actors("transporteur")
+                            if not logistics.agreement_problems(c, pickup_date, props["damageClass"])]
+                if carriers:
+                    carrier = sorted(carriers, key=lambda c: c["name"])[0]
+                    logistics.schedule(repo, order_uid, admin_user, carrier["uid"], pickup_date, pickup_slot,
+                                       f"Collecte automatique suite déclaration de casse ({fault_type}).")
+                    flash(f"Casse déclarée sur {battery_id} : statut passé à « Waste » et enlèvement planifié automatiquement avec {carrier['name']}.", "success")
+                else:
+                    flash(f"Casse déclarée sur {battery_id} : statut passé à « Waste » et ordre de transfert créé vers {dest_name}.", "success")
+            else:
+                flash(f"Casse déclarée sur {battery_id} : statut passé à « Waste » et ordre de transfert créé vers {dest_name}.", "success")
+        except Exception as e:
+            flash(f"Casse déclarée sur {battery_id} : statut passé à « Waste » ({e}).", "success")
+    else:
+        try:
+            workflow.request_waste(repo, battery_id, admin_user, fault_type, comment, destination_uid,
+                                   auto_logistics=auto_logistics, pickup_date=pickup_date, pickup_slot=pickup_slot)
+            flash(f"Demande de mise au rebut pour {battery_id} transmise.", "success")
+        except WorkflowError as e:
+            flash(str(e), "error")
+
+    return redirect(url_for("admin_home") + "#batteries")
 
 
 if __name__ == "__main__":

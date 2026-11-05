@@ -1,0 +1,927 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord Administrateur · Battery Passport{% endblock %}
+
+{% block hero %}
+<div class="login-hero admin-hero">
+  <div class="small" style="letter-spacing:.2em;opacity:.85">MODE ADMINISTRATEUR GLOBAL</div>
+  <h1>Supervision des Comptes & Gestion Directe du Parc</h1>
+  <p style="opacity:.9;margin:0">Pilotez les comptes acteurs et gérez les statuts et casses de batteries directement en un clic.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Navigation Principale par Onglets -->
+<div class="admin-tabs">
+  <button type="button" class="admin-tab-btn active" id="tab-btn-comptes" onclick="switchMainTab('comptes')">
+    👥 Comptes & Acteurs ({{ accounts_list|length }})
+  </button>
+  <button type="button" class="admin-tab-btn" id="tab-btn-batteries" onclick="switchMainTab('batteries')">
+    🔋 Gestion du Parc de Batteries ({{ batteries|length }})
+  </button>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- ONGLET 1 : COMPTES & ACTEURS (TABLEAU ALIGNÉ + FILTRE MODERNE)           -->
+<!-- ========================================================================= -->
+<div id="tab-pane-comptes" class="admin-tab-pane active">
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="margin:0">👥 Répertoire des Comptes Utilisateurs</h2>
+        <p class="muted small" style="margin:4px 0 0">
+          Sélectionnez un acteur ou commutez sur sa session sans mot de passe pour tester son interface.
+        </p>
+      </div>
+      <div class="small muted">
+        <strong id="accounts-count">{{ accounts_list|length }}</strong> compte(s) affiché(s)
+      </div>
+    </div>
+
+    <!-- NOUVEAU MENU FILTRE INTERACTIF (COMPTES) -->
+    <div class="filter-builder" style="margin-top:14px">
+      <div class="filter-bar-header">
+        
+        <!-- Recherche textuelle -->
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="account-search-input"
+                 placeholder="Rechercher par nom, @identifiant, ID acteur, batterie..."
+                 oninput="filterAccounts()">
+        </div>
+
+        <!-- Menu déroulant dynamique par critères & valeurs -->
+        <details class="filter-dropdown-details" id="details-account-filter">
+          <summary class="btn-filter-trigger" id="btn-trigger-account-filter">
+            <span>⚡ Filtrer par...</span> <span class="arrow">▾</span>
+          </summary>
+
+          <div class="filter-popover-menu" id="popover-account">
+            <!-- Étape 1 : Choix du critère -->
+            <div id="account-crit-step">
+              <div class="filter-popover-title">Choisir un critère :</div>
+              <div class="filter-option" onclick="openAccountCritValues('role')">
+                <span><span class="f-icon">👤</span> Type de compte / Rôle</span>
+                <span class="arrow">&rarr;</span>
+              </div>
+              <div class="filter-option" onclick="openAccountCritValues('battery')">
+                <span><span class="f-icon">🔋</span> Batterie détenue</span>
+                <span class="arrow">&rarr;</span>
+              </div>
+            </div>
+
+            <!-- Étape 2a : Choix de la valeur Rôle -->
+            <div id="account-val-role" style="display:none">
+              <div class="filter-popover-back" onclick="backToAccountCrit()">
+                &larr; Retour aux critères
+              </div>
+              <div class="filter-popover-title">Sélectionner un rôle :</div>
+              <div class="filter-val-item" onclick="applyAccountFilterCriteria('role', 'garagiste', 'Garagiste')">
+                🚗 Garagiste (Atelier)
+              </div>
+              <div class="filter-val-item" onclick="applyAccountFilterCriteria('role', 'proprietaire', 'Propriétaire')">
+                🏢 Propriétaire (OEM / Flotte)
+              </div>
+              <div class="filter-val-item" onclick="applyAccountFilterCriteria('role', 'centre_tri', 'Centre de tri')">
+                ♻️ Centre de tri (Recycleur)
+              </div>
+              <div class="filter-val-item" onclick="applyAccountFilterCriteria('role', 'transporteur', 'Transporteur')">
+                🚚 Transporteur (Logistique ADR)
+              </div>
+              <div class="filter-val-item" onclick="applyAccountFilterCriteria('role', 'admin', 'Administrateur')">
+                👑 Administrateur
+              </div>
+            </div>
+
+            <!-- Étape 2b : Choix de la valeur Batterie -->
+            <div id="account-val-battery" style="display:none">
+              <div class="filter-popover-back" onclick="backToAccountCrit()">
+                &larr; Retour aux critères
+              </div>
+              <div class="filter-popover-title">Sélectionner une batterie :</div>
+              {% for b in batteries %}
+                <div class="filter-val-item" onclick="applyAccountFilterCriteria('battery', '{{ b.batteryId }}', '{{ b.batteryId }}')">
+                  🔋 <strong>{{ b.batteryId }}</strong> <span class="small muted" style="margin-left:6px">({{ b.location or 'Garage' }})</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+
+        <!-- Zone des étiquettes (Chips) de filtres actifs -->
+        <div class="active-filter-chips" id="account-active-chips"></div>
+
+        <!-- Bouton Effacer tout -->
+        <button type="button" class="btn-clear-all" id="btn-clear-accounts" style="display:none" onclick="clearAllAccountFilters()">
+          Effacer tous les filtres
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Éléments cachés pour compatibilité de tests -->
+    <select id="account-role-filter" style="display:none"><option value=""></option></select>
+    <select id="account-battery-filter" style="display:none"><option value=""></option></select>
+
+    <!-- Tableau aligné des comptes -->
+    <div class="admin-table-container">
+      <table class="admin-table" id="accounts-table">
+        <thead>
+          <tr>
+            <th style="width:130px">Identifiant</th>
+            <th>Nom du compte / Organisation</th>
+            <th style="width:160px">Rôle / Profil</th>
+            <th style="width:140px">ID Acteur</th>
+            <th>Batteries détenues / associées</th>
+            <th style="width:170px;text-align:right">Action</th>
+          </tr>
+        </thead>
+        <tbody id="accounts-tbody">
+          {% for a in accounts_list %}
+          <tr class="account-row"
+              data-name="{{ a.display|lower }}"
+              data-username="{{ a.username|lower }}"
+              data-role="{{ a.role }}"
+              data-actor="{{ a.actor_uid|lower }}"
+              data-batteries="{{ a.held_batteries|join(' ')|lower }}">
+            <td>
+              <code style="font-weight:700;color:var(--navy);font-size:.9rem">@{{ a.username }}</code>
+            </td>
+            <td>
+              <strong style="color:var(--navy);font-size:.95rem">{{ a.display }}</strong>
+              {% if a.operator_uid %}
+                <div class="small muted">Opérateur : <code>{{ a.operator_uid }}</code></div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge" style="background:var(--card-subtle);color:var(--ink);font-weight:700;border:1px solid var(--line)">
+                {{ a.role_label }}
+              </span>
+            </td>
+            <td>
+              <code style="font-size:.85rem;color:var(--muted)">{{ a.actor_uid or '—' }}</code>
+            </td>
+            <td>
+              {% if a.held_batteries %}
+                <div style="display:flex;gap:5px;flex-wrap:wrap">
+                  {% for bid in a.held_batteries %}
+                    <span class="admin-pill-btn" onclick="applyAccountFilterCriteria('battery', '{{ bid }}', '{{ bid }}')" title="Filtrer sur {{ bid }}">
+                      🔋 {{ bid }}
+                    </span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="small muted">—</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right">
+              {% if a.username != 'admin' %}
+                <a class="btn small" style="padding:.35rem .75rem;font-size:.85rem;white-space:nowrap"
+                   href="{{ url_for('admin_switch', target_user=a.username) }}">
+                  ⚡ Se connecter &rarr;
+                </a>
+              {% else %}
+                <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.75rem">Session active</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="no-accounts-msg" class="muted small" style="display:none;text-align:center;padding:24px">
+      Aucun compte ne correspond aux filtres sélectionnés.
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- ONGLET 2 : GESTION DES BATTERIES (4 ONGLETS + FILTRE MODERNE)             -->
+<!-- ========================================================================= -->
+<div id="tab-pane-batteries" class="admin-tab-pane">
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="margin:0">🔋 Gestion du Parc de Batteries</h2>
+        <p class="muted small" style="margin:4px 0 0">
+          Modifiez les statuts et déclarez les casses directement sur les batteries sans vous connecter aux comptes tiers.
+        </p>
+      </div>
+      <div class="small muted">
+        <strong id="batteries-count">{{ batteries|length }}</strong> batterie(s) affichée(s)
+      </div>
+    </div>
+
+    <!-- 4 SOUS-ONGLETS DE CYCLE DE VIE DES BATTERIES -->
+    <div class="battery-subtabs" style="margin-top:16px">
+      <button type="button" class="battery-subtab-btn active" id="subtab-btn-all" onclick="switchBatteryFilterTab('all')">
+        📋 Toutes les batteries <span class="tab-count">{{ batteries|length }}</span>
+      </button>
+      <button type="button" class="battery-subtab-btn" id="subtab-btn-healthy" onclick="switchBatteryFilterTab('healthy')">
+        🟢 1. En forme <span class="tab-count">{{ count_healthy }}</span>
+      </button>
+      <button type="button" class="battery-subtab-btn" id="subtab-btn-damaged" onclick="switchBatteryFilterTab('damaged')">
+        ⚠️ 2. Casse / Avarie déclarée <span class="tab-count">{{ count_damaged }}</span>
+      </button>
+      <button type="button" class="battery-subtab-btn" id="subtab-btn-transit" onclick="switchBatteryFilterTab('transit')">
+        🚚 3. En transit de transport <span class="tab-count">{{ count_transit }}</span>
+      </button>
+      <button type="button" class="battery-subtab-btn" id="subtab-btn-tri" onclick="switchBatteryFilterTab('tri')">
+        🏭 4. Dans les centres de tri <span class="tab-count">{{ count_tri }}</span>
+      </button>
+    </div>
+
+    <!-- NOUVEAU MENU FILTRE INTERACTIF (BATTERIES) -->
+    <div class="filter-builder">
+      <div class="filter-bar-header">
+        
+        <!-- Recherche textuelle -->
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="battery-search-input"
+                 placeholder="Rechercher une batterie : ID (ex. BAT-002), modèle, statut, lieu..."
+                 oninput="filterBatteriesTable()">
+        </div>
+
+        <!-- Menu déroulant dynamique par critères & valeurs -->
+        <details class="filter-dropdown-details" id="details-battery-filter">
+          <summary class="btn-filter-trigger" id="btn-trigger-battery-filter">
+            <span>⚡ Filtrer par...</span> <span class="arrow">▾</span>
+          </summary>
+
+          <div class="filter-popover-menu" id="popover-battery">
+            <!-- Étape 1 : Choix du critère -->
+            <div id="battery-crit-step">
+              <div class="filter-popover-title">Choisir un critère :</div>
+              <div class="filter-option" onclick="openBatteryCritValues('status')">
+                <span><span class="f-icon">🏷️</span> Statut réglementaire</span>
+                <span class="arrow">&rarr;</span>
+              </div>
+              <div class="filter-option" onclick="openBatteryCritValues('loc')">
+                <span><span class="f-icon">📍</span> Localisation</span>
+                <span class="arrow">&rarr;</span>
+              </div>
+              <div class="filter-option" onclick="openBatteryCritValues('health')">
+                <span><span class="f-icon">⚡</span> État de santé SoH</span>
+                <span class="arrow">&rarr;</span>
+              </div>
+            </div>
+
+            <!-- Étape 2a : Choix du Statut -->
+            <div id="battery-val-status" style="display:none">
+              <div class="filter-popover-back" onclick="backToBatteryCrit()">
+                &larr; Retour aux critères
+              </div>
+              <div class="filter-popover-title">Sélectionner un statut :</div>
+              {% for st in statuses %}
+                <div class="filter-val-item" onclick="applyBatteryFilterCriteria('status', '{{ st }}', '{{ status_label.get(st, st) if status_label else st }}')">
+                  <span class="badge st-{{ st }}">{{ status_label.get(st, st) if status_label else st }}</span>
+                </div>
+              {% endfor %}
+            </div>
+
+            <!-- Étape 2b : Choix de la Localisation -->
+            <div id="battery-val-loc" style="display:none">
+              <div class="filter-popover-back" onclick="backToBatteryCrit()">
+                &larr; Retour aux critères
+              </div>
+              <div class="filter-popover-title">Sélectionner un lieu :</div>
+              <div class="filter-val-item" onclick="applyBatteryFilterCriteria('loc', 'garage', 'Garage Hill Valley')">
+                📍 Garage Hill Valley
+              </div>
+              <div class="filter-val-item" onclick="applyBatteryFilterCriteria('loc', 'nanterre', 'Centre de tri Recyclo Nanterre')">
+                📍 Centre de tri Recyclo Nanterre
+              </div>
+              <div class="filter-val-item" onclick="applyBatteryFilterCriteria('loc', 'lyon', 'Centre de tri Rhône Batteries')">
+                📍 Centre de tri Rhône Batteries
+              </div>
+            </div>
+
+            <!-- Étape 2c : Choix de la Santé SoH -->
+            <div id="battery-val-health" style="display:none">
+              <div class="filter-popover-back" onclick="backToBatteryCrit()">
+                &larr; Retour aux critères
+              </div>
+              <div class="filter-popover-title">Plage de santé SoH :</div>
+              <div class="filter-val-item" onclick="applyBatteryFilterCriteria('health', 'high', 'SoH ≥ 80 % (Saine)')">
+                🟢 SoH ≥ 80 % (Saine)
+              </div>
+              <div class="filter-val-item" onclick="applyBatteryFilterCriteria('health', 'mid', '60 % ≤ SoH < 80 % (Usée)')">
+                🟡 60 % ≤ SoH < 80 % (Usée)
+              </div>
+              <div class="filter-val-item" onclick="applyBatteryFilterCriteria('health', 'low', 'SoH < 60 % (Critique)')">
+                🔴 SoH < 60 % (Critique)
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Zone des étiquettes (Chips) de filtres actifs -->
+        <div class="active-filter-chips" id="battery-active-chips"></div>
+
+        <!-- Bouton Effacer tout -->
+        <button type="button" class="btn-clear-all" id="btn-clear-batteries" style="display:none" onclick="clearAllBatteryFilters()">
+          Effacer tous les filtres
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Élément caché pour compatibilité de tests -->
+    <select id="battery-status-filter" style="display:none"><option value=""></option></select>
+
+    <!-- TABLEAU ALIGNÉ DES BATTERIES -->
+    <div class="admin-table-container">
+      <table class="admin-table" id="batteries-table">
+        <thead>
+          <tr>
+            <th style="width:130px">ID Batterie</th>
+            <th>Modèle & Chimie</th>
+            <th style="width:120px">Statut Actuel</th>
+            <th style="width:120px">Santé (SoH)</th>
+            <th>Localisation</th>
+            <th style="width:160px">État & Logistique</th>
+            <th style="width:230px">Modifier Statut</th>
+            <th style="width:130px">Casse / Avarie</th>
+            <th style="width:180px;text-align:right">Vues Métiers</th>
+          </tr>
+        </thead>
+        <tbody id="batteries-tbody">
+          {% for b in batteries %}
+          <tr class="battery-row"
+              data-bid="{{ b.batteryId|lower }}"
+              data-model="{{ (b.model or '')|lower }}"
+              data-status="{{ b.status }}"
+              data-soh="{{ b.soh }}"
+              data-loc="{{ (b.location or '')|lower }}"
+              data-healthy="{{ '1' if b.is_healthy else '0' }}"
+              data-damaged="{{ '1' if b.is_damaged else '0' }}"
+              data-transit="{{ '1' if b.is_transit else '0' }}"
+              data-tri="{{ '1' if b.is_tri else '0' }}">
+
+            <!-- ID Batterie -->
+            <td>
+              <strong style="font-size:1rem;color:var(--navy)">{{ b.batteryId }}</strong>
+            </td>
+
+            <!-- Modèle & Chimie -->
+            <td>
+              <div>{{ b.model or 'FluxCap 85 kWh' }}</div>
+              <span class="chip" style="font-size:.7rem;padding:.1rem .4rem">{{ b.chemistry }}</span>
+            </td>
+
+            <!-- Statut Actuel -->
+            <td>
+              <span class="badge st-{{ b.status }}">{{ status_label.get(b.status, b.status) if status_label else b.status }}</span>
+            </td>
+
+            <!-- SoH / Santé -->
+            <td>
+              <div style="font-weight:700;color:var(--navy)">{{ b.soh }} %</div>
+              <div class="gauge {{ 'low' if b.soh < 60 else ('mid' if b.soh < 80 else '') }}" style="width:80px;margin-top:2px">
+                <span style="width:{{ b.soh }}%"></span>
+              </div>
+            </td>
+
+            <!-- Localisation -->
+            <td class="small">
+              📍 {{ b.location or 'Non assigné' }}
+            </td>
+
+            <!-- État & Logistique -->
+            <td>
+              {% if b.is_transit %}
+                <span class="badge st-SCHEDULED" style="font-size:.75rem">🚚 En transit ADR</span>
+                {% if b.transfer %}<div class="small muted">Ordre : {{ b.transfer.uid }}</div>{% endif %}
+              {% elif b.is_tri %}
+                <span class="badge st-APPROVED" style="font-size:.75rem">🏭 Centre de tri</span>
+              {% elif b.is_damaged %}
+                <span class="badge st-REJECTED" style="font-size:.75rem">⚠️ Avarie / Casse</span>
+                {% if b.alerts_count %}<div class="small muted" style="color:#b91c1c">{{ b.alerts_count }} module(s) hors seuil</div>{% endif %}
+              {% else %}
+                <span class="badge st-Original" style="font-size:.75rem">🟢 En forme</span>
+              {% endif %}
+            </td>
+
+            <!-- Action 1 : Modifier Statut Directement -->
+            <td>
+              <form method="post" action="{{ url_for('admin_battery_status', battery_id=b.batteryId) }}" style="display:flex;gap:4px;align-items:center">
+                <select name="status" class="admin-select" style="min-height:32px;font-size:.8rem;padding:2px 6px">
+                  {% for st in statuses %}
+                    <option value="{{ st }}" {% if b.status == st %}selected{% endif %}>
+                      {{ status_label.get(st, st) if status_label else st }}
+                    </option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn small" style="min-height:32px;padding:2px 8px;font-size:.8rem" title="Mettre à jour directement">
+                  OK
+                </button>
+              </form>
+            </td>
+
+            <!-- Action 2 : Déclarer Casse / Avarie -->
+            <td>
+              <button type="button" class="btn danger small" style="min-height:32px;padding:3px 8px;font-size:.8rem;white-space:nowrap"
+                      onclick="document.getElementById('modal-incident-{{ b.batteryId }}').showModal()"
+                      title="Déclarer une casse sur {{ b.batteryId }}">
+                ⚡ Casse
+              </button>
+            </td>
+
+            <!-- Vues Métiers -->
+            <td style="text-align:right">
+              <div style="display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">
+                <a class="btn ghost small" style="padding:.2rem .4rem;min-height:unset;font-size:.75rem"
+                   href="{{ url_for('public_battery', battery_id=b.batteryId) }}" target="_blank" title="Vue Publique Annexe XIII">
+                  🌐 Public
+                </a>
+                <a class="btn ghost small" style="padding:.2rem .4rem;min-height:unset;font-size:.75rem"
+                   href="{{ url_for('admin_switch', target_user='garagiste', next=url_for('garage_battery', battery_id=b.batteryId)) }}" title="Garage">
+                  🚗
+                </a>
+                <a class="btn ghost small" style="padding:.2rem .4rem;min-height:unset;font-size:.75rem"
+                   href="{{ url_for('admin_switch', target_user='proprietaire', next=url_for('owner_battery', battery_id=b.batteryId)) }}" title="Propriétaire">
+                  🏢
+                </a>
+                <a class="btn ghost small" style="padding:.2rem .4rem;min-height:unset;font-size:.75rem"
+                   href="{{ url_for('admin_switch', target_user='centretri', next=url_for('tri_battery', battery_id=b.batteryId)) }}" title="Tri">
+                  ♻️
+                </a>
+              </div>
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="no-batteries-msg" class="muted small" style="display:none;text-align:center;padding:24px">
+      Aucune batterie ne correspond aux critères de sélection.
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- DIALOGUES MODAUX POUR LA DÉCLARATION DIRECTE DE CASSE                    -->
+<!-- ========================================================================= -->
+{% for b in batteries %}
+<dialog id="modal-incident-{{ b.batteryId }}" class="doc-modal" onclick="if (event.target === this) this.close()">
+  <div class="modal-header" style="background:#991b1b;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <span class="chip" style="background:rgba(255,255,255,0.2);color:#fff;font-size:.75rem;margin-bottom:4px">
+        Intervention Administrative Directe
+      </span>
+      <h3 style="margin:2px 0 0;font-size:1.15rem;color:#fff">
+        🚨 Déclaration de Casse / Avarie · {{ b.batteryId }}
+      </h3>
+    </div>
+    <button type="button" class="doc-btn-close" onclick="document.getElementById('modal-incident-{{ b.batteryId }}').close()" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer">
+      ✕
+    </button>
+  </div>
+
+  <div class="modal-body" style="padding:18px">
+    <div style="background:#fff5f5;border:1px solid #fecaca;padding:10px 14px;border-radius:8px;margin-bottom:14px">
+      <strong>Batterie concernée :</strong> {{ b.batteryId }} ({{ b.model }}) · Statut actuel : <strong>{{ b.status }}</strong> · Localisation : 📍 {{ b.location }}
+    </div>
+
+    <form method="post" action="{{ url_for('admin_battery_incident', battery_id=b.batteryId) }}">
+      
+      <div style="margin-bottom:12px">
+        <label style="font-weight:700;display:block;margin-bottom:4px;font-size:.9rem">Type de défaut constaté :</label>
+        <select name="fault_type" class="admin-select" style="width:100%" required>
+          {% for ft in fault_types %}
+            <option value="{{ ft }}">{{ ft }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-weight:700;display:block;margin-bottom:4px;font-size:.9rem">Description / Rapport de casse :</label>
+        <textarea name="comment" rows="2" class="admin-search-input" style="width:100%;height:auto"
+                  placeholder="ex. Module 3 perforé lors d'une manutention, non réparable sur site, risque court-circuit." required></textarea>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-weight:700;display:block;margin-bottom:4px;font-size:.9rem">Mode de traitement :</label>
+        <select name="mode" class="admin-select" style="width:100%">
+          <option value="direct_waste">🔴 Immédiat : Passage direct en « Waste » & Ordre de transfert automatique</option>
+          <option value="request_waste">🟡 Signalement standard : Création d'une demande pour arbitrage propriétaire</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label style="font-weight:700;display:block;margin-bottom:4px;font-size:.9rem">Centre de tri de destination :</label>
+        <select name="destination" class="admin-select" style="width:100%">
+          {% for d in destinations %}
+            <option value="{{ d.uid }}">{{ d.name }} ({{ d.city }}) {% if d.agreed %}★ Agréé{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="margin-bottom:16px;background:var(--bg);padding:10px 14px;border-radius:8px;border:1px solid var(--line)">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem">
+          <input type="checkbox" name="auto_logistics" value="1" checked>
+          <strong>Planifier automatiquement la collecte logistique (Transporteur ADR)</strong>
+        </label>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn ghost" onclick="document.getElementById('modal-incident-{{ b.batteryId }}').close()">
+          Annuler
+        </button>
+        <button type="submit" class="btn danger" style="padding:.5rem 1.2rem">
+          🚨 Enregistrer la déclaration de casse
+        </button>
+      </div>
+
+    </form>
+  </div>
+</dialog>
+{% endfor %}
+
+
+<!-- ========================================================================= -->
+<!-- SECTION DÉMONSTRATION & RÉINITIALISATION                                 -->
+<!-- ========================================================================= -->
+<div class="card" style="margin-top:20px;border:1px dashed var(--line);background:var(--card-subtle)">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <div>
+      <h3 style="margin:0;font-size:1rem;color:var(--navy)">⚙️ Démonstration & Données de test</h3>
+      <p class="muted small" style="margin:2px 0 0">
+        Réinitialisez l'ensemble de la base graphe à son état initial pour une nouvelle démonstration.
+      </p>
+    </div>
+    <form method="post" action="{{ url_for('admin_reset') }}"
+          onsubmit="return confirm('Réinitialiser toutes les données de démo ? Cette action remet à zéro l\'état des batteries, transferts et notifications.')">
+      <button class="btn danger small" type="submit">
+        🔄 Réinitialiser les données de démo
+      </button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// --- Navigation principale (Comptes vs Batteries) ---
+function switchMainTab(tabName) {
+  document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.admin-tab-pane').forEach(pane => pane.classList.remove('active'));
+
+  const btn = document.getElementById('tab-btn-' + tabName);
+  const pane = document.getElementById('tab-pane-' + tabName);
+  if (btn && pane) {
+    btn.classList.add('active');
+    pane.classList.add('active');
+    window.location.hash = '#' + tabName;
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const hash = window.location.hash.replace('#', '');
+  if (hash === 'batteries' || hash === 'comptes') {
+    switchMainTab(hash);
+  }
+
+  // Fermeture des menus détails au clic extérieur
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('details.filter-dropdown-details') && !e.target.closest('.admin-pill-btn')) {
+      document.querySelectorAll('details.filter-dropdown-details').forEach(d => d.removeAttribute('open'));
+    }
+  });
+
+  // Réinitialisation aux étapes initiales à chaque ouverture
+  const dAccount = document.getElementById('details-account-filter');
+  if (dAccount) {
+    dAccount.addEventListener('toggle', () => { if (dAccount.open) backToAccountCrit(); });
+  }
+  const dBattery = document.getElementById('details-battery-filter');
+  if (dBattery) {
+    dBattery.addEventListener('toggle', () => { if (dBattery.open) backToBatteryCrit(); });
+  }
+});
+
+
+// ============================================================================
+// FILTRAGE DYNAMIQUE DES COMPTES
+// ============================================================================
+const accountActiveFilters = {
+  role: null,
+  roleLabel: '',
+  battery: null
+};
+
+function backToAccountCrit() {
+  const step = document.getElementById('account-crit-step');
+  const r = document.getElementById('account-val-role');
+  const b = document.getElementById('account-val-battery');
+  if (step) step.style.display = 'block';
+  if (r) r.style.display = 'none';
+  if (b) b.style.display = 'none';
+}
+
+function openAccountCritValues(crit) {
+  const step = document.getElementById('account-crit-step');
+  if (step) step.style.display = 'none';
+  if (crit === 'role') document.getElementById('account-val-role').style.display = 'block';
+  if (crit === 'battery') document.getElementById('account-val-battery').style.display = 'block';
+}
+
+function applyAccountFilterCriteria(crit, value, displayLabel) {
+  accountActiveFilters[crit] = value;
+  if (crit === 'role') accountActiveFilters.roleLabel = displayLabel;
+
+  const d = document.getElementById('details-account-filter');
+  if (d) d.removeAttribute('open');
+
+  renderAccountFilterChips();
+  filterAccounts();
+}
+
+function removeAccountFilter(crit) {
+  accountActiveFilters[crit] = null;
+  if (crit === 'role') accountActiveFilters.roleLabel = '';
+
+  renderAccountFilterChips();
+  filterAccounts();
+}
+
+function clearAllAccountFilters() {
+  accountActiveFilters.role = null;
+  accountActiveFilters.roleLabel = '';
+  accountActiveFilters.battery = null;
+  document.getElementById('account-search-input').value = '';
+
+  const d = document.getElementById('details-account-filter');
+  if (d) d.removeAttribute('open');
+
+  renderAccountFilterChips();
+  filterAccounts();
+}
+
+function renderAccountFilterChips() {
+  const container = document.getElementById('account-active-chips');
+  const clearBtn = document.getElementById('btn-clear-accounts');
+  container.innerHTML = '';
+  let hasFilter = false;
+
+  if (accountActiveFilters.role) {
+    hasFilter = true;
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.innerHTML = `<span class="chip-label">Rôle :</span> <strong>${accountActiveFilters.roleLabel}</strong> <span class="chip-close" onclick="removeAccountFilter('role')">✕</span>`;
+    container.appendChild(chip);
+  }
+
+  if (accountActiveFilters.battery) {
+    hasFilter = true;
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.innerHTML = `<span class="chip-label">Batterie :</span> <strong>${accountActiveFilters.battery}</strong> <span class="chip-close" onclick="removeAccountFilter('battery')">✕</span>`;
+    container.appendChild(chip);
+  }
+
+  clearBtn.style.display = (hasFilter || document.getElementById('account-search-input').value) ? 'inline-block' : 'none';
+}
+
+function filterAccounts() {
+  const query = (document.getElementById('account-search-input').value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('.account-row');
+  let visibleCount = 0;
+
+  rows.forEach(row => {
+    const name = row.getAttribute('data-name') || '';
+    const username = row.getAttribute('data-username') || '';
+    const role = row.getAttribute('data-role') || '';
+    const actor = row.getAttribute('data-actor') || '';
+    const batteries = row.getAttribute('data-batteries') || '';
+
+    let matchQuery = true;
+    if (query) {
+      matchQuery = name.includes(query) || username.includes(query) || actor.includes(query) || role.includes(query) || batteries.includes(query);
+    }
+
+    let matchRole = true;
+    if (accountActiveFilters.role) {
+      matchRole = (role === accountActiveFilters.role);
+    }
+
+    let matchBattery = true;
+    if (accountActiveFilters.battery) {
+      matchBattery = batteries.split(' ').includes(accountActiveFilters.battery.toLowerCase());
+    }
+
+    if (matchQuery && matchRole && matchBattery) {
+      row.style.display = '';
+      visibleCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  const countEl = document.getElementById('accounts-count');
+  if (countEl) countEl.textContent = visibleCount;
+
+  const noMsg = document.getElementById('no-accounts-msg');
+  if (noMsg) noMsg.style.display = (visibleCount === 0) ? 'block' : 'none';
+
+  const clearBtn = document.getElementById('btn-clear-accounts');
+  if (clearBtn) {
+    clearBtn.style.display = (query || accountActiveFilters.role || accountActiveFilters.battery) ? 'inline-block' : 'none';
+  }
+}
+
+
+// ============================================================================
+// 4 SOUS-ONGLETS & FILTRAGE DYNAMIQUE DES BATTERIES
+// ============================================================================
+let currentBatterySubtab = 'all';
+const batteryActiveFilters = {
+  status: null,
+  statusLabel: '',
+  loc: null,
+  locLabel: '',
+  health: null,
+  healthLabel: ''
+};
+
+function switchBatteryFilterTab(filterKey) {
+  currentBatterySubtab = filterKey;
+  document.querySelectorAll('.battery-subtab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.getElementById('subtab-btn-' + filterKey);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  filterBatteriesTable();
+}
+
+function backToBatteryCrit() {
+  const step = document.getElementById('battery-crit-step');
+  const st = document.getElementById('battery-val-status');
+  const l = document.getElementById('battery-val-loc');
+  const h = document.getElementById('battery-val-health');
+  if (step) step.style.display = 'block';
+  if (st) st.style.display = 'none';
+  if (l) l.style.display = 'none';
+  if (h) h.style.display = 'none';
+}
+
+function openBatteryCritValues(crit) {
+  const step = document.getElementById('battery-crit-step');
+  if (step) step.style.display = 'none';
+  if (crit === 'status') document.getElementById('battery-val-status').style.display = 'block';
+  if (crit === 'loc') document.getElementById('battery-val-loc').style.display = 'block';
+  if (crit === 'health') document.getElementById('battery-val-health').style.display = 'block';
+}
+
+function applyBatteryFilterCriteria(crit, value, displayLabel) {
+  batteryActiveFilters[crit] = value;
+  batteryActiveFilters[crit + 'Label'] = displayLabel;
+
+  const d = document.getElementById('details-battery-filter');
+  if (d) d.removeAttribute('open');
+
+  renderBatteryFilterChips();
+  filterBatteriesTable();
+}
+
+function removeBatteryFilter(crit) {
+  batteryActiveFilters[crit] = null;
+  batteryActiveFilters[crit + 'Label'] = '';
+
+  renderBatteryFilterChips();
+  filterBatteriesTable();
+}
+
+function clearAllBatteryFilters() {
+  batteryActiveFilters.status = null;
+  batteryActiveFilters.statusLabel = '';
+  batteryActiveFilters.loc = null;
+  batteryActiveFilters.locLabel = '';
+  batteryActiveFilters.health = null;
+  batteryActiveFilters.healthLabel = '';
+  document.getElementById('battery-search-input').value = '';
+
+  const d = document.getElementById('details-battery-filter');
+  if (d) d.removeAttribute('open');
+
+  switchBatteryFilterTab('all');
+  renderBatteryFilterChips();
+  filterBatteriesTable();
+}
+
+function renderBatteryFilterChips() {
+  const container = document.getElementById('battery-active-chips');
+  const clearBtn = document.getElementById('btn-clear-batteries');
+  container.innerHTML = '';
+  let hasFilter = false;
+
+  if (batteryActiveFilters.status) {
+    hasFilter = true;
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.innerHTML = `<span class="chip-label">Statut :</span> <strong>${batteryActiveFilters.statusLabel}</strong> <span class="chip-close" onclick="removeBatteryFilter('status')">✕</span>`;
+    container.appendChild(chip);
+  }
+
+  if (batteryActiveFilters.loc) {
+    hasFilter = true;
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.innerHTML = `<span class="chip-label">Lieu :</span> <strong>${batteryActiveFilters.locLabel}</strong> <span class="chip-close" onclick="removeBatteryFilter('loc')">✕</span>`;
+    container.appendChild(chip);
+  }
+
+  if (batteryActiveFilters.health) {
+    hasFilter = true;
+    const chip = document.createElement('div');
+    chip.className = 'filter-chip';
+    chip.innerHTML = `<span class="chip-label">Santé :</span> <strong>${batteryActiveFilters.healthLabel}</strong> <span class="chip-close" onclick="removeBatteryFilter('health')">✕</span>`;
+    container.appendChild(chip);
+  }
+
+  clearBtn.style.display = (hasFilter || document.getElementById('battery-search-input').value || currentBatterySubtab !== 'all') ? 'inline-block' : 'none';
+}
+
+function filterBatteriesTable() {
+  const query = (document.getElementById('battery-search-input').value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('.battery-row');
+  let visibleCount = 0;
+
+  rows.forEach(row => {
+    const bid = row.getAttribute('data-bid') || '';
+    const model = row.getAttribute('data-model') || '';
+    const status = row.getAttribute('data-status') || '';
+    const loc = row.getAttribute('data-loc') || '';
+    const soh = parseInt(row.getAttribute('data-soh') || '0', 10);
+
+    const isHealthy = row.getAttribute('data-healthy') === '1';
+    const isDamaged = row.getAttribute('data-damaged') === '1';
+    const isTransit = row.getAttribute('data-transit') === '1';
+    const isTri = row.getAttribute('data-tri') === '1';
+
+    // 1. Filtrage par sous-onglet de cycle de vie (4 onglets)
+    let matchSubtab = true;
+    if (currentBatterySubtab === 'healthy') matchSubtab = isHealthy;
+    else if (currentBatterySubtab === 'damaged') matchSubtab = isDamaged;
+    else if (currentBatterySubtab === 'transit') matchSubtab = isTransit;
+    else if (currentBatterySubtab === 'tri') matchSubtab = isTri;
+
+    // 2. Recherche textuelle
+    let matchQuery = true;
+    if (query) {
+      matchQuery = bid.includes(query) || model.includes(query) || loc.includes(query) || status.toLowerCase().includes(query);
+    }
+
+    // 3. Filtre de statut
+    let matchStatus = true;
+    if (batteryActiveFilters.status) {
+      matchStatus = (status === batteryActiveFilters.status);
+    }
+
+    // 4. Filtre de localisation
+    let matchLoc = true;
+    if (batteryActiveFilters.loc) {
+      matchLoc = loc.includes(batteryActiveFilters.loc);
+    }
+
+    // 5. Filtre de santé SoH
+    let matchHealth = true;
+    if (batteryActiveFilters.health === 'high') matchHealth = (soh >= 80);
+    else if (batteryActiveFilters.health === 'mid') matchHealth = (soh >= 60 && soh < 80);
+    else if (batteryActiveFilters.health === 'low') matchHealth = (soh < 60);
+
+    if (matchSubtab && matchQuery && matchStatus && matchLoc && matchHealth) {
+      row.style.display = '';
+      visibleCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  const countEl = document.getElementById('batteries-count');
+  if (countEl) countEl.textContent = visibleCount;
+
+  const noMsg = document.getElementById('no-batteries-msg');
+  if (noMsg) noMsg.style.display = (visibleCount === 0) ? 'block' : 'none';
+
+  const clearBtn = document.getElementById('btn-clear-batteries');
+  if (clearBtn) {
+    clearBtn.style.display = (query || batteryActiveFilters.status || batteryActiveFilters.loc || batteryActiveFilters.health || currentBatterySubtab !== 'all') ? 'inline-block' : 'none';
+  }
+}
+</script>
+{% endblock %}

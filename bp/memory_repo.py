@@ -333,6 +333,18 @@ class MemoryRepo:
         with self.lock:
             self._event(self._battery(battery_id)["uid"], etype, actor_uid, details)
 
+    def set_battery_status(self, battery_id, new_status, actor_uid=None, details=None):
+        with self.lock:
+            b = self._battery(battery_id)
+            if not b:
+                return None
+            old_status = b.get("status")
+            b["status"] = new_status
+            actor_uid = actor_uid or "OWNER-FLUX"
+            evt_details = details or f"Statut modifié : {old_status} → {new_status}"
+            self._event(b["uid"], "STATUS_CHANGED", actor_uid, evt_details)
+            return old_status
+
     # --- Défi 3 : orientation de fin de vie ----------------------------------------
     def record_orientation(self, battery_id, actor_uid, choice, recommended, comment):
         with self.lock:
