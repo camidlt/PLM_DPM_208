@@ -388,6 +388,20 @@ class Neo4jRepo:
             bid=battery_id, actor_uid=actor_uid, evt_uid=new_uid("EVT"), etype=etype,
             at=now(), details=details)
 
+    def set_battery_status(self, battery_id, new_status, actor_uid=None, details=None):
+        actor_uid = actor_uid or "OWNER-FLUX"
+        res = self._read("MATCH (b:BatteryInstance {batteryId: $bid}) RETURN b.status AS status", bid=battery_id)
+        old_status = res[0]["status"] if res else "Original"
+        evt_details = details or f"Statut modifié : {old_status} → {new_status}"
+        self._write("""
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (actor:Actor {uid: $actor_uid})
+            SET b.status = $new_status
+            """ + EVENT_CREATE,
+            bid=battery_id, actor_uid=actor_uid, new_status=new_status, evt_uid=new_uid("EVT"),
+            etype="STATUS_CHANGED", at=now(), details=evt_details)
+        return old_status
+
     # --- Défi 3 : orientation de fin de vie ----------------------------------------
     def record_orientation(self, battery_id, actor_uid, choice, recommended, comment):
         uid = new_uid("ORI")

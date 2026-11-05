@@ -565,3 +565,131 @@ dialog.doc-modal::backdrop {
 .admin-hero {
   background: linear-gradient(135deg, var(--navy) 0%, #312e81 100%);
 }
+
+
+/* --- Admin Tabs, Search & Action Panel --- */
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 2px;
+}
+.admin-tab-btn {
+  background: var(--card-subtle);
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  padding: 12px 24px;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-tab-btn:hover {
+  color: var(--navy);
+  background: #fff;
+}
+.admin-tab-btn.active {
+  color: var(--navy);
+  background: #fff;
+  border-color: var(--navy);
+  border-bottom: 3px solid var(--accent);
+  margin-bottom: -4px;
+  font-weight: 700;
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.03);
+}
+.admin-tab-pane {
+  display: none;
+}
+.admin-tab-pane.active {
+  display: block;
+}
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  background: var(--card-subtle);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.admin-search-input {
+  flex: 1 1 240px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: .9rem;
+  background: #fff;
+  color: var(--ink);
+}
+.admin-search-input:focus {
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(30, 27, 75, 0.1);
+}
+.admin-select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: .85rem;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.admin-account-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform .15s, box-shadow .15s;
+}
+.admin-account-card:hover {
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+}
+.admin-battery-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: .88rem;
+}
+.admin-battery-table th {
+  background: var(--card-subtle);
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 2px solid var(--line);
+  font-weight: 700;
+  color: var(--navy);
+}
+.admin-battery-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.admin-battery-table tr:hover td {
+  background: rgba(0,0,0,0.015);
+}
+.admin-direct-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.admin-incident-box {
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 10px;
+}

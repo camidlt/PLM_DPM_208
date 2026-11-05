@@ -32,61 +32,107 @@ def test_admin_login(client):
     # Follow redirect to /admin
     res_admin = client.get("/admin")
     assert res_admin.status_code == 200
-    assert "Supervision" in res_admin.get_data(as_text=True)
-    assert "Garage Hill Valley" in res_admin.get_data(as_text=True)
+    html = res_admin.get_data(as_text=True)
+    assert "Supervision" in html
+    assert "Garage Hill Valley" in html
+    # Vérification des deux onglets
+    assert "tab-btn-comptes" in html
+    assert "tab-btn-batteries" in html
+    assert "account-search-input" in html
+    assert "account-role-filter" in html
+    assert "account-battery-filter" in html
+    assert "battery-search-input" in html
 
 
 def test_admin_switch_account(client):
-    # Log in as admin
     client.post("/login", data={"username": "admin", "password": "admin"})
 
-    # Switch to garagiste
     res = client.get("/admin/switch/garagiste", follow_redirects=True)
     assert res.status_code == 200
     content = res.get_data(as_text=True)
     assert "Garage Hill Valley" in content
-    # Admin bar must be present because session['is_admin'] is preserved
     assert "Mode Admin" in content
 
-    # Switch to proprietaire
     res_prop = client.get("/admin/switch/proprietaire", follow_redirects=True)
     assert res_prop.status_code == 200
     content_prop = res_prop.get_data(as_text=True)
     assert "Flux Motors" in content_prop
     assert "Mode Admin" in content_prop
 
-    # Switch back to admin
     res_back = client.get("/admin/switch/admin", follow_redirects=True)
     assert res_back.status_code == 200
     assert "Supervision" in res_back.get_data(as_text=True)
 
 
 def test_admin_auto_switch_on_protected_routes(client):
-    # Log in as admin
     client.post("/login", data={"username": "admin", "password": "admin"})
 
-    # Admin accesses /garage directly -> auto-switches to garagiste
     res = client.get("/garage", follow_redirects=True)
     assert res.status_code == 200
     assert "Garage Hill Valley" in res.get_data(as_text=True)
 
-    # Admin accesses /owner directly -> auto-switches to proprietaire
     res2 = client.get("/owner", follow_redirects=True)
     assert res2.status_code == 200
     assert "Flux Motors" in res2.get_data(as_text=True)
 
 
 def test_non_admin_cannot_switch_or_access_admin(client):
-    # Log in as garagiste
     client.post("/login", data={"username": "garagiste", "password": "garage123"})
 
-    # Try to access /admin
     res = client.get("/admin", follow_redirects=False)
     assert res.status_code == 302
     assert "/login" in res.headers["Location"]
 
-    # Try to switch
     res_switch = client.get("/admin/switch/proprietaire", follow_redirects=False)
     assert res_switch.status_code == 302
     assert "/login" in res_switch.headers["Location"]
 
+
+def test_admin_direct_status_change(client):
+    """L'admin peut modifier directement le statut d'une batterie sans passer par un compte tiers."""
+    client.post("/login", data={"username": "admin", "password": "admin"})
+
+    # BAT-002 est initialement Original
+    p_before = repo.get_passport("BAT-002")
+    assert p_before["battery"]["status"] == "Original"
+
+    # Modification directe vers Waste
+    res = client.post("/admin/battery/BAT-002/status",
+                      data={"status": "Waste", "comment": "Mise au rebut administrative directe"},
+                      follow_redirects=True)
+    assert res.status_code == 200
+
+    p_after = repo.get_passport("BAT-002")
+    assert p_after["battery"]["status"] == "Waste"
+
+    # Vérification de l'événement dans l'historique
+    history = repo.get_history("BAT-002")
+    assert any("Statut modifié par l'administrateur : Waste" in e["details"] for e in history)
+
+
+def test_admin_direct_incident_declaration(client):
+    """L'admin peut déclarer directement une casse sans connexion au compte garagiste."""
+    client.post("/login", data={"username": "admin", "password": "admin"})
+
+    # BAT-DOC-001 est Original
+    p_before = repo.get_passport("BAT-DOC-001")
+    assert p_before["battery"]["status"] == "Original"
+
+    # Déclaration directe d'une casse
+    res = client.post("/admin/battery/BAT-DOC-001/incident",
+                      data={
+                          "fault_type": "Choc / déformation physique",
+                          "comment": "Chute de pont en atelier, pack perforé",
+                          "mode": "direct_waste",
+                          "destination": "CT-NANTERRE",
+                          "auto_logistics": "1"
+                      },
+                      follow_redirects=True)
+    assert res.status_code == 200
+
+    p_after = repo.get_passport("BAT-DOC-001")
+    assert p_after["battery"]["status"] == "Waste"
+
+    # Vérifie présence du transfert direct
+    assert p_after.get("transfer") is not None
+    assert p_after["transfer"]["toUid"] == "CT-NANTERRE"
