@@ -572,14 +572,6 @@ def not_found(_):
     return render_template("error.html", message="Batterie ou page introuvable."), 404
 
 
-if __name__ == "__main__":
-    import os
-    print(f" * Base de données : {repo.backend}")
-    print(f" * QR codes pointent vers : {config.BASE_URL}")
-    app.run(host=os.environ.get("BP_HOST", "0.0.0.0"), port=int(os.environ.get("BP_PORT", 5000)),
-            debug=os.environ.get("BP_DEBUG") == "1")
-
-
 # --- Administration & commutation de compte --------------------------------------
 @app.route("/admin")
 def admin_home():
@@ -616,4 +608,9 @@ def admin_switch(target_user):
     return redirect(url_for(ROLE_HOME[target_acc["role"]]))
 
 
-
+if __name__ == "__main__":
+    import os
+    print(f" * Base de données : {repo.backend}")
+    print(f" * QR codes pointent vers : {config.BASE_URL}")
+    app.run(host=os.environ.get("BP_HOST", "0.0.0.0"), port=int(os.environ.get("BP_PORT", 5000)),
+            debug=os.environ.get("BP_DEBUG") == "1")
