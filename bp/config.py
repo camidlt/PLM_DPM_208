@@ -7,8 +7,7 @@ NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "password")
 NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 
-# URL publique de l'appli, encodée dans les QR codes (mettre l'IP du PC sur le Wi-Fi
-# pour scanner depuis une tablette/un téléphone, ex. http://192.168.1.20:5000)
+# URL publique de l'appli encodée dans les QR codes
 BASE_URL = os.environ.get("BP_BASE_URL", "http://localhost:5000").rstrip("/")
 
 SECRET_KEY = os.environ.get("BP_SECRET_KEY", "dev-hackathon-battery-passport")

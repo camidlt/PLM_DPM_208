@@ -16,7 +16,7 @@
 {% endif %}
 <div class="grid two" style="margin-top:16px">
   <div>{{ ui.identification(p) }}{{ ui.performance(p) }}{{ ui.modules(p) }}
-       {{ defis.telemetry_card(p, readings, chart) }}</div>
+       {{ defis.telemetry_card(p, readings, chart, test_status) }}</div>
   <div>{{ defis.decision_card(p, reco, orientation) }}{{ ui.transfer_card(p) }}{{ ui.composition(p) }}{{ ui.sustainability(p) }}{{ ui.history_card(history) }}</div>
 </div>
 {% endblock %}

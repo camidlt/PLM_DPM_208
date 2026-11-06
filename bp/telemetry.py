@@ -12,16 +12,82 @@ Format d'une trame (JSON) :
       "measuredAt": "2026-11-04T10:15:00",   # optionnel, défaut : maintenant
       "source": "BMS",                        # optionnel
       "soh": 92.5, "soc": 74,                 # optionnels, en %
+      "test_status": "RUNNING",               # optionnel : RUNNING, COMPLETED
+      "test_remaining_sec": 12,               # optionnel
       "modules": [{"index": 1, "internalResistance_mOhm": 1.12,
                    "temperature_C": 24.5},    # temperature_C optionnelle
                   ...]
     }
 """
+import time
 from datetime import datetime
 
 from .workflow import WorkflowError, module_alerts
 
 BMS_ACTOR_UID = "BMS-GATEWAY"
+
+# Suivi d'état du test de diagnostic actif / terminé (en mémoire)
+_TEST_STATUS = {}
+
+
+def _normalize_id(battery_id):
+    bid = str(battery_id or "").strip().upper()
+    if bid in ("DLR-1985", "DLR1985", "DELOREAN"):
+        return "BAT-DOC-001"
+    return bid
+
+
+def update_test_status(battery_id, data):
+    """Enregistre le statut de test envoyé par le simulateur / banc de diagnostic."""
+    if not battery_id or not isinstance(data, dict):
+        return
+    bid = _normalize_id(battery_id)
+    st = data.get("test_status")
+    if st == "RESET":
+        _TEST_STATUS.pop(bid, None)
+        return
+    rem = data.get("test_remaining_sec")
+    dur = data.get("test_duration_sec") or 15
+    if st in ("RUNNING", "COMPLETED", "ALERT"):
+        _TEST_STATUS[bid] = {
+            "state": st,
+            "remaining": rem,
+            "duration": dur,
+            "updated_at": time.time(),
+        }
+
+
+def get_test_status(battery_id, p=None):
+    """Calcule l'état actuel pour l'interface : en cours (avec chrono), terminé ou veille."""
+    bid = _normalize_id(battery_id)
+    info = _TEST_STATUS.get(bid)
+    now = time.time()
+    if info:
+        elapsed = now - info.get("updated_at", 0)
+        if info["state"] == "RUNNING":
+            if elapsed > 16:  # Timeout si arrêt inopiné du script
+                info["state"] = "COMPLETED"
+            else:
+                rem = info.get("remaining")
+                return dict(state="RUNNING", label="⏱️ Diagnostic en cours...",
+                            css_class="status-running", remaining=rem)
+
+        if (info["state"] == "COMPLETED" or info["state"] == "ALERT") and elapsed < 240:
+            has_alert = False
+            if p:
+                has_alert = bool(module_alerts(p))
+            if has_alert:
+                return dict(state="ALERT", label="⚠️ Diagnostic terminé · Anomalie détectée",
+                            css_class="status-alert", remaining=0)
+            return dict(state="COMPLETED", label="✅ Diagnostic terminé · Modules conformes",
+                        css_class="status-ok", remaining=0)
+
+    # Si aucune session de banc active, mais que la batterie porte une anomalie module
+    if p and module_alerts(p):
+        return dict(state="ALERT", label="⚠️ Anomalie BMS détectée sur un module",
+                    css_class="status-alert", remaining=0)
+
+    return dict(state="IDLE", label="⚪ Prêt · Aucun test en cours", css_class="status-idle", remaining=0)
 
 
 class TelemetryError(WorkflowError):
@@ -111,6 +177,9 @@ def ingest(repo, data):
     if unknown:
         raise TelemetryError(f"Module(s) inconnu(s) sur {frame['batteryId']} : {unknown}.")
 
+    # Met à jour le statut du test de diagnostic si transmis
+    update_test_status(frame["batteryId"], data)
+
     # Une trame plus ancienne que la dernière mesure est archivée sans écraser l'état actuel.
     last = max([m.get("measuredAt") or "" for m in p["modules"]]
                + [p["dynamic_performance"].get("measuredAt") or ""])
@@ -136,23 +205,48 @@ def ingest(repo, data):
 def resistance_chart(readings, modules, width=460, height=190, last=12):
     """Prépare une courbe SVG (sans librairie JS) : une ligne par module + le seuil.
 
-    `readings` : relevés triés du plus ancien au plus récent. Renvoie None s'il y a
-    moins de deux relevés.
+    `readings` : relevés triés du plus ancien au plus récent.
+    Agrège au maximum une valeur par jour (la dernière mesure enregistrée à la journée)
+    afin de conserver l'ensemble de la chronologie historique (plusieurs mois)
+    même lors de tests intensifs réalisés le même jour.
     """
-    readings = [r for r in readings if r.get("resistances")][-last:]
-    if len(readings) < 2 or not modules:
+    valid = [r for r in readings if r.get("resistances")]
+    if len(valid) < 2 or not modules:
         return None
+
+    # Agrégation journalière : dernière mesure de chaque date distincte
+    by_day = {}
+    for r in valid:
+        day = (r.get("at") or "")[:10]
+        if day:
+            by_day[day] = r
+
+    if len(by_day) >= 2:
+        chart_readings = list(by_day.values())[-last:]
+        is_daily = True
+        first_label = chart_readings[0]["at"][:10]
+        last_label = chart_readings[-1]["at"][:10]
+    else:
+        # Relevés tous concentrés sur la même journée : on affiche les N derniers relevés avec l'heure
+        chart_readings = valid[-last:]
+        is_daily = False
+        first_label = (chart_readings[0].get("at") or "")[11:16] or chart_readings[0]["at"][:10]
+        last_label = (chart_readings[-1].get("at") or "")[11:16] or chart_readings[-1]["at"][:10]
+
+    if len(chart_readings) < 2:
+        return None
+
     max_r = {m["index"]: m.get("maxInternalResistance_mOhm") for m in modules}
     threshold = max((v for v in max_r.values() if v), default=None)
     series = {}
-    for k, r in enumerate(readings):
+    for k, r in enumerate(chart_readings):
         for idx, val in zip(r.get("moduleIndexes") or [], r["resistances"]):
             series.setdefault(idx, []).append((k, val))
     top = max([v for pts in series.values() for _, v in pts] + [(threshold or 0) * 1.5]) * 1.1
     pad_l, pad_r, pad_t, pad_b = 36, 34, 10, 22
     w, h = width - pad_l - pad_r, height - pad_t - pad_b
-    x = lambda k: round(pad_l + w * k / (len(readings) - 1), 1)  # noqa: E731
-    y = lambda v: round(pad_t + h * (1 - v / top), 1)           # noqa: E731
+    x = lambda k: round(pad_l + w * k / (len(chart_readings) - 1), 1)  # noqa: E731
+    y = lambda v: round(pad_t + h * (1 - v / top), 1)                  # noqa: E731
     lines = []
     for idx in sorted(series):
         pts = series[idx]
@@ -175,4 +269,6 @@ def resistance_chart(readings, modules, width=460, height=190, last=12):
     return dict(width=width, height=height, lines=lines, ticks=ticks,
                 left=pad_l, right=width - pad_r, bottom=height - pad_b,
                 threshold=threshold, threshold_y=y(threshold) if threshold else None,
-                first_at=readings[0]["at"], last_at=readings[-1]["at"], count=len(readings))
+                first_label=first_label, last_label=last_label,
+                first_at=chart_readings[0]["at"], last_at=chart_readings[-1]["at"],
+                count=len(chart_readings), is_daily=is_daily)

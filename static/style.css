@@ -983,3 +983,60 @@ details.filter-dropdown-details[open] summary .arrow {
   width: 290px;
   overflow: hidden;
 }
+
+/* --- BMS Test Status Badge & Live Chrono --- */
+.bms-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
+}
+.bms-status-badge .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+.bms-status-badge.status-idle {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+.bms-status-badge.status-running {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #93c5fd;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.2);
+  animation: pulseBmsBadge 1.4s infinite ease-in-out;
+}
+.bms-status-badge.status-running .status-dot {
+  background: #2563eb;
+  box-shadow: 0 0 6px #2563eb;
+}
+.bms-status-badge.status-alert {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fca5a5;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.15);
+}
+.bms-status-badge.status-alert .status-dot {
+  background: #dc2626;
+}
+.bms-status-badge.status-ok {
+  background: #f0fdf4;
+  color: #16a34a;
+  border-color: #86efac;
+}
+.bms-status-badge.status-ok .status-dot {
+  background: #16a34a;
+}
+@keyframes pulseBmsBadge {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}

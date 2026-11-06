@@ -202,7 +202,8 @@ def challenge_context(p, history):
                 reco=decision.recommend(p, history, readings),
                 orientation=repo.get_orientation(battery_id),
                 decision_options=decision.OPTIONS,
-                recovery_targets=decision.RECOVERY_TARGETS)
+                recovery_targets=decision.RECOVERY_TARGETS,
+                test_status=telemetry.get_test_status(battery_id, p))
 
 
 # --- Garagiste ---------------------------------------------------------------------
@@ -401,7 +402,8 @@ def api_telemetry_latest(battery_id):
 def api_battery_telemetry(user, battery_id):
     load_passport(battery_id)
     limit = max(1, min(request.args.get("limit", 50, type=int), 500))
-    return jsonify(batteryId=battery_id, readings=repo.get_telemetry(battery_id, limit))
+    p = load_passport(battery_id)
+    return jsonify(batteryId=battery_id, readings=repo.get_telemetry(battery_id, limit), test_status=telemetry.get_test_status(battery_id, p))
 
 
 @app.route("/api/battery/<battery_id>/decision")
