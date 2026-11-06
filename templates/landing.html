@@ -42,7 +42,7 @@
 <section class="band" id="parcours">
   <div class="wrap">
     <div class="band-head">
-      <h2>Quatre étapes, trois écrans, un seul passeport</h2>
+      <h2>Quatre étapes, quatre écrans, un seul passeport</h2>
       <p>Chaque acteur ne voit que ce qu'il a le droit de voir. Chaque geste devient un nœud du graphe, horodaté, avec son auteur.</p>
     </div>
     <div class="chain">
@@ -63,14 +63,15 @@
       <div class="station">
         <span class="node" aria-hidden="true"></span>
         <h3>Transfert</h3>
-        <div class="who">{{ icon('truck') }} Propriétaire · desktop</div>
-        <p>Choisit un centre de tri agréé. Un dépôt non agréé n'est pas sélectionnable, l'ordre est écrit dans le graphe.</p>
+        <div class="who">{{ icon('truck') }} Transporteur · mobile</div>
+        <p>Affecté automatiquement s'il est agréé ADR. Pose le scellé, pèse, coche les contrôles ADR : la batterie passe sous sa garde, étiquette UN 3480 à l'appui.</p>
+        <a class="btn enter" href="{{ url_for('login', **{'as': 'transporteur'}) }}">Entrer comme transporteur {{ icon('arrow-right') }}</a>
       </div>
       <div class="station">
         <span class="node" aria-hidden="true"></span>
         <h3>Réception et décision</h3>
         <div class="who">{{ icon('warehouse') }} Centre de tri · mobile</div>
-        <p>Vérifie que le statut est bien Waste, accuse réception, puis choisit Reuse, Remanufacture, Repurpose ou Recycle.</p>
+        <p>Vérifie le statut Waste, relit le scellé et pèse : preuve de dépôt. Puis choisit Reuse, Remanufacture, Repurpose ou Recycle.</p>
         <a class="btn enter" href="{{ url_for('login', **{'as': 'centretri'}) }}">Entrer comme centre de tri {{ icon('arrow-right') }}</a>
       </div>
     </div>
@@ -85,7 +86,7 @@
     </div>
     <div class="flow">
       <div class="wire">
-        <div class="hop"><span class="glyph">{{ icon('cpu', 'lg') }}</span><div><h3>ESP32 · 5 entrées analogiques</h3><p>Une broche par module (GPIO 34, 35, 32, 33, 25). La lecture devient une résistance interne en mΩ ; le module 3 simule le défaut du défi 1.</p></div></div>
+        <div class="hop"><span class="glyph">{{ icon('cpu', 'lg') }}</span><div><h3>ESP32 · 5 entrées analogiques</h3><p>Une broche par module (GPIO 34, 35, 32, 33, 39). La lecture devient une résistance interne en mΩ ; le module 3 simule le défaut du défi 1.</p></div></div>
         <div class="hop live"><span class="glyph">{{ icon('wifi', 'lg') }}</span><div><h3>Wi-Fi · HTTP toutes les 3 s</h3><p>L'ESP32 rejoint le même réseau que le PC et envoie un JSON sur <code>/api/telemetry</code>. Le Bluetooth reste actif pour le débogage.</p></div></div>
         <div class="hop"><span class="glyph">{{ icon('network', 'lg') }}</span><div><h3>Graphe · Module, Measurement, Alert</h3><p>Chaque mesure met à jour le nœud Module et s'ajoute à son historique. Au troisième dépassement consécutif, une alerte et un événement sont créés.</p></div></div>
         <div class="hop"><span class="glyph">{{ icon('gauge', 'lg') }}</span><div><h3>Écrans · rafraîchis toutes les 2 s</h3><p>Le garagiste voit le module chauffer et le formulaire de signalement se préremplir à partir de l'alerte.</p></div></div>
@@ -149,13 +150,13 @@
         </table>
       </div>
       <div class="panel">
-        <h2>{{ icon('clock') }} Scénario en deux minutes</h2>
+        <h2>{{ icon('clock') }} Scénario en trois minutes</h2>
         <ol class="just">
-          <li>Garagiste : scanner {{ demo_battery }}, constater le module 3 critique, signaler hors d'usage.</li>
-          <li>Centre de tri : scanner, la réception est refusée car le statut n'est pas à jour.</li>
-          <li>Propriétaire : valider Original vers Waste et choisir Recyclo Nanterre.</li>
-          <li>Centre de tri : confirmer la réception, puis valider la recommandation.</li>
-          <li>Montrer l'historique : chaque étape est horodatée avec son acteur.</li>
+          <li>Garagiste : scanner {{ demo_battery }}, constater le module 3 critique, choisir Recyclo Nanterre et la collecte automatique, signaler hors d'usage.</li>
+          <li>Propriétaire : valider Original vers Waste, le transporteur agréé est affecté automatiquement.</li>
+          <li>Transporteur : poser le scellé, peser, cocher les contrôles ADR.</li>
+          <li>Centre de tri : un mauvais scellé est bloqué ; le bon donne la preuve de dépôt. Valider la recommandation.</li>
+          <li>Montrer l'historique, les notifications et le manifeste : chaque étape est signée par son acteur.</li>
         </ol>
       </div>
     </div>

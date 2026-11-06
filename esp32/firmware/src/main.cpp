@@ -35,10 +35,11 @@ PubSubClient mqttClient(netClient);
 #endif
 #endif
 
-const char* BATTERY_ID = "DLR-1985";          // la batterie de Doc dans le passeport
+const char* BATTERY_ID = "BAT-DOC-001";          // la batterie de Doc dans le passeport
 const char* DEVICE_ID  = "esp32-bms-delorean";
 const int NUM_MODULES = 5;
-const int SENSOR_PINS[NUM_MODULES] = {34, 35, 32, 33, 25};  // entrées analogiques
+// entrées analogiques ADC1 uniquement : l'ADC2 (GPIO 25...) est indisponible quand le Wi-Fi tourne
+const int SENSOR_PINS[NUM_MODULES] = {34, 35, 32, 33, 39};
 const int FAULTY_MODULE = 3;
 const int BOOT_BUTTON = 0;
 const int LED_PIN = 2;                         // LED intégrée : clignote à chaque envoi
@@ -107,7 +108,8 @@ void send(const String& json) {
   http.setTimeout(2500);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Id", DEVICE_ID);
-  if (strlen(DEVICE_TOKEN) > 0) http.addHeader("X-Device-Token", DEVICE_TOKEN);
+  // clé machine attendue par /api/telemetry (BP_BMS_KEY côté serveur, bms-demo-key par défaut)
+  http.addHeader("X-BMS-Key", strlen(DEVICE_TOKEN) > 0 ? DEVICE_TOKEN : "bms-demo-key");
   int code = http.POST(json);
   if (code > 0) Serial.printf("POST %s -> %d\n", SERVER_URL, code);
   else Serial.printf("POST erreur : %s\n", http.errorToString(code).c_str());

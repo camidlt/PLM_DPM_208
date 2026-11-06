@@ -15,6 +15,21 @@
   {% include "_decision_form.html" %}
 </section>
 {% endif %}
+{% if p.transfer and p.transfer.state in ('CANCELLED', 'REFUSED') and p.battery.status == 'Waste' %}{% set t = p.transfer %}
+<section class="request" style="margin-top:20px">
+  <h2 style="display:flex; gap:10px; align-items:center">{{ icon('repeat-2') }} {{ 'Rediriger la batterie' if t.state == 'REFUSED' else 'Nouvel ordre de transfert' }}</h2>
+  <p class="small soft" style="margin-top:6px">{% if t.state == 'REFUSED' %}{{ t.toName }} a refusé la réception : {{ t.refusalReason }}. La batterie reste sous scellé chez {{ t.carrierName }}.{% else %}L'ordre {{ t.uid }} a été annulé.{% endif %}</p>
+  <form method="post" action="{{ url_for('owner_new_order', battery_id=p.battery.batteryId) }}" style="margin-top:10px; max-width:520px">
+    <label for="new-dest">Centre de tri</label>
+    <select id="new-dest" name="destination" required>
+      {% for c in centers %}<option value="{{ c.uid }}" {% if c.problems or (t.state == 'REFUSED' and c.uid == t.toUid) %}disabled{% endif %}>{{ c.name }} ({{ c.city }}){% if c.problems %} · {{ c.problems|join(', ') }}{% endif %}</option>{% endfor %}
+    </select>
+    <label for="new-cmt">Commentaire <span class="mute">(optionnel)</span></label>
+    <input id="new-cmt" name="comment">
+    <button class="btn primary block" style="margin-top:14px" type="submit">{{ icon('send') }} Créer l'ordre</button>
+  </form>
+</section>
+{% endif %}
 <div class="grid two" style="margin-top:20px">
   <div>
     {{ ui.live_bay(p, live) }}

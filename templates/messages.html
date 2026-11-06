@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Notifications · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Notifications</h1>
+    <p class="mute" style="margin-top:8px">{{ user.display }}. Chaque étape du transfert prévient les acteurs concernés, ici et par mail (simulé sans serveur SMTP).</p>
+  </div>
+  <section class="panel">
+    <h2>{{ icon('send') }} Reçues <span class="badge st-Original" style="margin-left:4px">{{ messages|length }}</span></h2>
+    {% for m in messages %}
+      <div class="msg {{ 'unread' if not m.read }}">
+        <strong>{{ m.subject }}</strong>
+        <div class="small soft" style="margin-top:4px">{{ m.body }}</div>
+        <div class="meta">{{ m.at|ts }} · {{ m.channel }}{% if m.email %} · {{ m.email }}{% endif %}
+          {% if m.link %} · <a href="{{ m.link }}">Ouvrir</a>{% endif %}</div>
+      </div>
+    {% else %}<p class="mute">Aucune notification.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

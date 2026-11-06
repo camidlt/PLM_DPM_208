@@ -49,7 +49,20 @@ NOTIF_RETURN = """
 MATCH (n)-[:ABOUT]->(b:BatteryInstance)
 MATCH (n)-[:ADDRESSED_TO]->(eo:EconomicOperator)
 OPTIONAL MATCH (s:Actor)-[:SENT]->(n)
-RETURN n{.*, batteryId: b.batteryId, senderName: s.name, operatorUid: eo.uid} AS n
+OPTIONAL MATCH (dest:Actor {uid: n.destinationUid})
+RETURN n{.*, batteryId: b.batteryId, senderUid: s.uid, senderName: s.name, operatorUid: eo.uid,
+         destinationName: dest.name} AS n
+"""
+
+# Ordre de transfert avec ses acteurs (départ, destination, transporteur affecté)
+TRANSFER_RETURN = """
+MATCH (t)-[:FOR]->(b:BatteryInstance)
+MATCH (t)-[:TO]->(d:Actor)
+OPTIONAL MATCH (t)-[:FROM]->(f:Actor)
+OPTIONAL MATCH (t)-[:ASSIGNED_TO]->(c:Actor)
+RETURN t{.*, batteryId: b.batteryId, batteryStatus: b.status, toUid: d.uid, toName: d.name,
+         toAgreed: d.agreed, fromUid: f.uid, fromName: f.name, carrierUid: c.uid,
+         carrierName: c.name} AS t
 """
 
 EVENT_CREATE = """
@@ -82,20 +95,37 @@ class Neo4jRepo:
     # --- initialisation -------------------------------------------------------
     def reset(self):
         """Efface les nœuds de démo puis recharge le jeu de données."""
-        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event OR n:Decision OR n:Measurement OR n:Alert DETACH DELETE n")
+        self._write("MATCH (n) WHERE n:Notification OR n:TransferOrder OR n:Event OR n:Decision "
+                    "OR n:Measurement OR n:Alert OR n:LogisticsStep OR n:Message OR n:TelemetryReading "
+                    "DETACH DELETE n")
         uids = [uid for _, uid, _ in seed_data.NODES]
         self._write("MATCH (n) WHERE n.uid IN $uids DETACH DELETE n", uids=uids)
         for stmt in seed_data.cypher_statements():
             self._write(stmt)
 
     # --- défi 1 : télémétrie BMS ------------------------------------------------
-    def record_telemetry(self, battery_id, readings, ts=None, source="BMS"):
+    def record_telemetry(self, battery_id, readings, ts=None, source="BMS", soh=None, soc=None):
         ts = ts or now()
         mods = {r["m"]["index"]: r["m"] for r in self._read(
             "MATCH (:BatteryInstance {batteryId: $id})-[:HAS_MODULE]->(m:Module) "
             "RETURN m{.*, index: coalesce(m.index, m.position)} AS m", id=battery_id)}
         if not mods:
             raise telemetry.TelemetryError(f"Batterie {battery_id} inconnue.")
+        # Un nœud (:TelemetryReading) par trame : l'historique complet reste dans le graphe
+        props = dict(uid=new_uid("TEL"), at=ts, source=source,
+                     moduleIndexes=[rd["index"] for rd in readings],
+                     resistances=[rd["r"] for rd in readings],
+                     temperatures=[rd["t"] for rd in readings])
+        props.update({k: v for k, v in (("soh", soh), ("soc", soc)) if v is not None})
+        self._write("""
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            CREATE (b)-[:HAS_TELEMETRY]->(:TelemetryReading $props)
+            WITH b
+            OPTIONAL MATCH (b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp)
+            FOREACH (_ IN CASE WHEN dp IS NULL OR ($soh IS NULL AND $soc IS NULL) THEN [] ELSE [1] END |
+              SET dp.soh = coalesce($soh, dp.soh), dp.soc = coalesce($soc, dp.soc), dp.measuredAt = $ts)
+            SET b.lastTelemetryAt = $ts
+            """, bid=battery_id, props=props, soh=soh, soc=soc, ts=ts)
         raised = []
         for rd in readings:
             m = mods.get(rd["index"])
@@ -129,18 +159,27 @@ class Neo4jRepo:
     def get_telemetry(self, battery_id, limit=60):
         rows = self._read("""
             MATCH (b:BatteryInstance {batteryId: $id})-[:HAS_MODULE]->(m:Module)
-            OPTIONAL MATCH (m)-[:HAS_MEASUREMENT]->(x:Measurement)
-            WITH b, m, x ORDER BY x.ts DESC
-            WITH b, m, collect(x{ts: x.ts, r: x.internalResistance_mOhm, v: x.voltage,
-                                 i: x.current, t: x.temperature})[..$limit] AS xs
             OPTIONAL MATCH (m)-[:RAISED]->(a:Alert)
             RETURN b.lastTelemetryAt AS last, coalesce(m.index, m.position) AS index,
-                   m{.*} AS m, reverse(xs) AS points, collect(a{.*}) AS alerts
-            ORDER BY index""", id=battery_id, limit=limit)
+                   m{.*} AS m, collect(a{.*}) AS alerts
+            ORDER BY index""", id=battery_id)
         if not rows:
             return None
+        # courbes : les derniers relevés (:TelemetryReading), du plus ancien au plus récent
+        readings = list(reversed([r["r"] for r in self._read("""
+            MATCH (:BatteryInstance {batteryId: $id})-[:HAS_TELEMETRY]->(r:TelemetryReading)
+            RETURN r{.at, .moduleIndexes, .resistances, .temperatures} AS r
+            ORDER BY r.at DESC LIMIT $limit""", id=battery_id, limit=limit)]))
+        series = {}
+        for rd in readings:
+            temps = rd.get("temperatures") or []
+            for k, idx in enumerate(rd.get("moduleIndexes") or []):
+                series.setdefault(idx, []).append(dict(
+                    ts=rd["at"], r=rd["resistances"][k], v=None, i=None,
+                    t=temps[k] if k < len(temps) else None))
         mods, alerts = [], []
         for row in rows:
+            row = dict(row.data(), points=series.get(row["index"], []))
             m = row["m"]
             r = m.get("internalResistance_mOhm", m.get("lastResistance"))
             rmax = m.get("maxInternalResistance_mOhm")
@@ -149,8 +188,18 @@ class Neo4jRepo:
                              t=m.get("lastTemperature"), v=m.get("lastVoltage"),
                              at=m.get("measuredAt"), points=row["points"]))
             alerts += row["alerts"]
+        extra = self._read("""
+            MATCH (b:BatteryInstance {batteryId: $id})
+            OPTIONAL MATCH (b)-[:HAS_DYNAMIC_PERFORMANCE]->(dp)
+            OPTIONAL MATCH (b)-[:HAS_TELEMETRY]->(r:TelemetryReading)
+            RETURN dp.soh AS soh, dp.soc AS soc, count(r) AS readings""", id=battery_id)[0]
         return dict(batteryId=battery_id, lastTelemetryAt=rows[0]["last"], modules=mods,
+                    soh=extra["soh"], soc=extra["soc"], readings=extra["readings"],
                     alerts=sorted(alerts, key=lambda a: a.get("at", ""), reverse=True))
+
+    def count_readings(self, battery_id):
+        return self._read("MATCH (:BatteryInstance {batteryId: $id})-[:HAS_TELEMETRY]->(r) "
+                          "RETURN count(r) AS n", id=battery_id)[0]["n"]
 
     # --- lectures ----------------------------------------------------------------
     def list_batteries(self):
@@ -189,12 +238,9 @@ class Neo4jRepo:
             "MATCH (n:Notification {state: 'PENDING'})-[:ABOUT]->(:BatteryInstance {batteryId: $id}) "
             "WITH n LIMIT 1" + NOTIF_RETURN, id=battery_id)
         p["pending_request"] = pending[0]["n"] if pending else None
-        transfer = self._read("""
-            MATCH (t:TransferOrder)-[:FOR]->(:BatteryInstance {batteryId: $id})
-            MATCH (t)-[:TO]->(d:Actor)
-            OPTIONAL MATCH (t)-[:FROM]->(f:Actor)
-            RETURN t{.*, toUid: d.uid, toName: d.name, toAgreed: d.agreed, fromName: f.name} AS t
-            ORDER BY t.createdAt DESC LIMIT 1""", id=battery_id)
+        transfer = self._read(
+            "MATCH (t:TransferOrder)-[:FOR]->(:BatteryInstance {batteryId: $id}) "
+            "WITH t ORDER BY t.supersededBy IS NULL DESC, t.createdAt DESC LIMIT 1" + TRANSFER_RETURN, id=battery_id)
         p["transfer"] = transfer[0]["t"] if transfer else None
         return p
 
@@ -217,11 +263,105 @@ class Neo4jRepo:
             "MATCH (a:Actor {role: $role}) RETURN a{.*} AS a ORDER BY a.name", role=role)]
 
     def list_transfers_to(self, center_uid):
-        return [r["t"] for r in self._read("""
-            MATCH (t:TransferOrder)-[:TO]->(:Actor {uid: $uid})
-            MATCH (t)-[:FOR]->(b:BatteryInstance)
-            RETURN t{.*, batteryId: b.batteryId, status: b.status} AS t
-            ORDER BY t.createdAt DESC""", uid=center_uid)]
+        rows = self._read("MATCH (t:TransferOrder)-[:TO]->(:Actor {uid: $uid}) WITH t"
+                          + TRANSFER_RETURN + " ORDER BY t.createdAt DESC", uid=center_uid)
+        return [dict(r["t"], status=r["t"]["batteryStatus"]) for r in rows]
+
+    # --- défi 2 : acteurs, transferts, étapes signées, messages ---------------------
+    def get_actor(self, uid):
+        rows = self._read("MATCH (a:Actor {uid: $uid}) RETURN a{.*} AS a", uid=uid)
+        return rows[0]["a"] if rows else None
+
+    def add_event(self, battery_id, etype, actor_uid, details):
+        self._write("MATCH (b:BatteryInstance {batteryId: $bid}) MATCH (actor:Actor {uid: $actor_uid})"
+                    + EVENT_CREATE, bid=battery_id, actor_uid=actor_uid, evt_uid=new_uid("EVT"),
+                    etype=etype, at=now(), details=details)
+
+    def get_transfer(self, order_uid):
+        rows = self._read("MATCH (t:TransferOrder {uid: $uid}) WITH t" + TRANSFER_RETURN, uid=order_uid)
+        return rows[0]["t"] if rows else None
+
+    def list_transfers(self, carrier_uid=None):
+        if carrier_uid:
+            q = "MATCH (t:TransferOrder)-[:ASSIGNED_TO]->(:Actor {uid: $uid}) WITH t"
+        else:
+            q = "MATCH (t:TransferOrder) WITH t"
+        return [r["t"] for r in self._read(q + TRANSFER_RETURN + " ORDER BY t.createdAt DESC",
+                                           uid=carrier_uid)]
+
+    def create_transfer(self, battery_id, from_uid, to_uid, props, carrier_uid=None):
+        uid = new_uid("TO")
+        self._write("""
+            MATCH (b:BatteryInstance {batteryId: $bid})
+            MATCH (dest:Actor {uid: $to_uid})
+            CREATE (t:TransferOrder $props)
+            SET t.uid = $uid, t.createdAt = $at
+            CREATE (t)-[:FOR]->(b)
+            CREATE (t)-[:TO]->(dest)
+            WITH t
+            OPTIONAL MATCH (f:Actor {uid: $from_uid})
+            OPTIONAL MATCH (c:Actor {uid: $carrier_uid})
+            FOREACH (_ IN CASE WHEN f IS NULL THEN [] ELSE [1] END | CREATE (t)-[:FROM]->(f))
+            FOREACH (_ IN CASE WHEN c IS NULL THEN [] ELSE [1] END | CREATE (t)-[:ASSIGNED_TO]->(c))
+            """, bid=battery_id, to_uid=to_uid, props=props, uid=uid, at=now(),
+            from_uid=from_uid or "", carrier_uid=carrier_uid or "")
+        return uid
+
+    def update_transfer(self, order_uid, props, carrier_uid=None, location_uid=None):
+        self._write("MATCH (t:TransferOrder {uid: $uid}) SET t += $props", uid=order_uid, props=props)
+        if carrier_uid:
+            self._write("""
+                MATCH (t:TransferOrder {uid: $uid})
+                OPTIONAL MATCH (t)-[old:ASSIGNED_TO]->()
+                DELETE old
+                WITH DISTINCT t
+                MATCH (c:Actor {uid: $carrier}) CREATE (t)-[:ASSIGNED_TO]->(c)
+                """, uid=order_uid, carrier=carrier_uid)
+        if location_uid:
+            self._write("""
+                MATCH (t:TransferOrder {uid: $uid})-[:FOR]->(b:BatteryInstance)
+                OPTIONAL MATCH (b)-[old:LOCATED_AT]->()
+                DELETE old
+                WITH DISTINCT b
+                MATCH (a:Actor {uid: $loc}) CREATE (b)-[:LOCATED_AT]->(a)
+                """, uid=order_uid, loc=location_uid)
+
+    def add_transfer_step(self, order_uid, actor_uid, step):
+        uid = new_uid("STEP")
+        self._write("""
+            MATCH (t:TransferOrder {uid: $order}) MATCH (a:Actor {uid: $actor})
+            CREATE (s:LogisticsStep $props) SET s.uid = $uid
+            CREATE (t)-[:HAS_STEP]->(s)
+            CREATE (a)-[:PERFORMED]->(s)
+            """, order=order_uid, actor=actor_uid, props=step, uid=uid)
+        return uid
+
+    def get_transfer_steps(self, order_uid):
+        return [r["s"] for r in self._read(
+            "MATCH (:TransferOrder {uid: $uid})-[:HAS_STEP]->(s:LogisticsStep) "
+            "RETURN s{.*} AS s ORDER BY s.seq", uid=order_uid)]
+
+    def add_message(self, to_uid, props):
+        uid = new_uid("MSG")
+        self._write("""
+            MATCH (a:Actor {uid: $to})
+            CREATE (m:Message $props) SET m.uid = $uid, m.read = false, m.at = $at
+            CREATE (m)-[:SENT_TO]->(a)
+            """, to=to_uid, props=props, uid=uid, at=now())
+        return uid
+
+    def list_messages(self, actor_uid):
+        return [r["m"] for r in self._read(
+            "MATCH (m:Message)-[:SENT_TO]->(:Actor {uid: $uid}) RETURN m{.*} AS m ORDER BY m.at DESC",
+            uid=actor_uid)]
+
+    def unread_count(self, actor_uid):
+        return self._read("MATCH (m:Message {read: false})-[:SENT_TO]->(:Actor {uid: $uid}) "
+                          "RETURN count(m) AS n", uid=actor_uid)[0]["n"]
+
+    def mark_messages_read(self, actor_uid):
+        self._write("MATCH (m:Message {read: false})-[:SENT_TO]->(:Actor {uid: $uid}) SET m.read = true",
+                    uid=actor_uid)
 
     # --- défi 3 : demandes du marché et décisions ------------------------------
     def list_demands(self):
@@ -302,7 +442,8 @@ class Neo4jRepo:
 
     # --- écritures --------------------------------------------------------------
     def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,
-                              requested_status, reason, diagnostic):
+                              requested_status, reason, diagnostic, destination_uid="",
+                              auto_logistics=False, pickup_date="", pickup_slot=""):
         uid = new_uid("NOTIF")
         self._write("""
             MATCH (b:BatteryInstance {batteryId: $bid})
@@ -310,14 +451,17 @@ class Neo4jRepo:
             MATCH (eo:EconomicOperator {uid: $op_uid})
             CREATE (n:Notification {uid: $uid, type: 'STATUS_CHANGE_REQUEST',
                     fromStatus: $from_status, requestedStatus: $requested, reason: $reason,
-                    diagnostic: $diagnostic, state: 'PENDING', createdAt: $at})
+                    diagnostic: $diagnostic, destinationUid: $dest, autoLogistics: $auto,
+                    pickupDate: $pdate, pickupSlot: $pslot, state: 'PENDING', createdAt: $at})
             CREATE (actor)-[:SENT]->(n)
             CREATE (n)-[:ABOUT]->(b)
             CREATE (n)-[:ADDRESSED_TO]->(eo)
             """ + EVENT_CREATE,
             bid=battery_id, actor_uid=actor_uid, op_uid=operator_uid, uid=uid,
             from_status=from_status, requested=requested_status, reason=reason,
-            diagnostic=diagnostic, at=now(), evt_uid=new_uid("EVT"), etype="FAULT_REPORTED",
+            diagnostic=diagnostic, dest=destination_uid or "", auto=bool(auto_logistics),
+            pdate=pickup_date or "", pslot=pickup_slot or "",
+            at=now(), evt_uid=new_uid("EVT"), etype="FAULT_REPORTED",
             details=f"Hors d'usage signalé : {reason} | {diagnostic}")
         return uid
 

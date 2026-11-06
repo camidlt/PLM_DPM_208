@@ -1,0 +1,46 @@
+{% extends "doc_base.html" %}
+{% import "_doc_macros.html" as d with context %}
+{% block title %}Manifeste {{ doc.order.uid }}{% endblock %}
+{% block doc %}
+{{ d.head(doc, 'Manifeste de transfert et preuve de dépôt') }}
+<section class="grid">
+  {{ d.party('Producteur, responsable du passeport', doc.parties.producer) }}
+  {{ d.party("Détenteur (lieu d'enlèvement)", doc.parties.holder) }}
+  {{ d.party('Transporteur', doc.parties.carrier) }}
+  {{ d.party('Destinataire', doc.parties.destination) }}
+</section>
+{{ d.goods(doc) }}
+{% set c = doc.custody %}
+<div class="box">
+  <h3>Prise en charge</h3>
+  <table>
+    <thead><tr><th>Scellé</th><th>Remis par</th><th>Pesée enlèvement</th><th>Pesée réception</th><th>Écart</th></tr></thead>
+    <tbody><tr><td>{{ c.sealNumber or 'n.c.' }}</td><td>{{ c.handedOverBy or 'n.c.' }}</td>
+      <td>{{ (c.pickupWeightKg ~ ' kg') if c.pickupWeightKg else 'n.c.' }}</td>
+      <td>{{ (c.receptionWeightKg ~ ' kg') if c.receptionWeightKg else 'n.c.' }}</td>
+      <td>{{ (c.weightDeviationPct ~ ' %') if c.weightDeviationPct is defined else 'n.c.' }}</td></tr></tbody>
+  </table>
+  {% if c.anomaly %}<p class="hot"><strong>Anomalie :</strong> {{ c.anomaly }}</p>{% endif %}
+  {% if doc.order.refusalReason %}<p class="hot"><strong>Refus à réception :</strong> {{ doc.order.refusalReason }}</p>{% endif %}
+</div>
+<div class="box">
+  <h3>Étapes signées (empreintes SHA-256 chaînées)</h3>
+  <table>
+    <thead><tr><th>N°</th><th>Étape</th><th>Date</th><th>Acteur</th><th>Empreinte</th></tr></thead>
+    <tbody>
+    {% for s in doc.steps %}
+    <tr><td>{{ s.seq }}</td><td>{{ s.label }}</td><td>{{ s.at|ts }}</td><td>{{ s.actor }}</td><td class="hash">{{ s.hash[:24] }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="box">
+  <h3>Preuve de dépôt</h3>
+  {% if c.receiptCode %}
+    <div class="receipt-code">{{ c.receiptCode }}</div>
+    <div>Batterie réceptionnée par {{ doc.parties.destination.name }} le {{ doc.order.receivedAt|ts }}.</div>
+  {% else %}<div class="mute">En attente de la réception par le centre de tri.</div>{% endif %}
+  <div class="small" style="margin-top:6px">Chaîne de preuves : {{ 'intacte' if doc.integrity.valid else "altérée à l'étape " ~ doc.integrity.brokenAtStep }}
+    · dernière empreinte <span class="hash">{{ doc.integrity.lastHash or 'n.c.' }}</span></div>
+</div>
+{% endblock %}

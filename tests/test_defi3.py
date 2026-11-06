@@ -14,7 +14,7 @@ from bp import decision
 TODAY = date(2026, 11, 4)
 EXPECTED = {
     "BAT-101": "Reuse",
-    "DLR-1985": "Remanufacture",
+    "BAT-DOC-001": "Remanufacture",
     "BAT-102": "Repurpose",
     "BAT-103": "Recycle",
     "BAT-004": "Recycle"
@@ -44,7 +44,7 @@ def test_regle_securite():
 
 
 def test_bascule_marche():
-    p = repo.get_passport("DLR-1985")
+    p = repo.get_passport("BAT-DOC-001")
     demands = repo.list_demands()
     res1 = decision.recommend(p, demands, today=TODAY)
     assert res1["recommendation"] == "Remanufacture"

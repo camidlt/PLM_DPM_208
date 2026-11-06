@@ -1,5 +1,5 @@
 """
-Émulateur BMS (plan B sans ESP32) : simule les 5 modules de la batterie DLR-1985.
+Émulateur BMS (plan B sans ESP32) : simule les 5 modules de la batterie BAT-DOC-001.
 
 Scénario : N mesures normales, puis le module défectueux dérive jusqu'au critique.
 
@@ -34,7 +34,7 @@ def build_payload(battery_id, faulty, extra_r):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--battery", default="DLR-1985")
+    ap.add_argument("--battery", default="BAT-DOC-001")
     ap.add_argument("--faulty", type=int, default=3, help="module défectueux (1-5)")
     ap.add_argument("--normal", type=int, default=5, help="nb de mesures normales avant dérive")
     ap.add_argument("--step", type=float, default=0.6, help="hausse de R par mesure (mΩ)")

@@ -45,14 +45,20 @@ Ce dépôt réunit en un seul site le travail de toutes les branches de l'équip
 
 | Page | Appareil visé | Qui | Ce qu'on y fait |
 |---|---|---|---|
-| `/` | Projecteur, ordinateur | Jury, visiteurs | Présentation du projet, les 5 modules de DLR-1985 en direct, le parcours, le fonctionnement de l'ESP32, les recommandations réelles du défi 3, l'accès aux comptes de test |
+| `/` | Projecteur, ordinateur | Jury, visiteurs | Présentation du projet, les 5 modules de BAT-DOC-001 en direct, le parcours, le fonctionnement de l'ESP32, les recommandations réelles du défi 3, l'accès aux comptes de test |
 | `/garage` | Tablette | Garagiste | Scanner le QR code, lire le passeport et la télémétrie en direct, signaler la batterie hors d'usage |
 | `/owner` | Ordinateur | Propriétaire du passeport | Recevoir les demandes, passer le statut de Original à Waste, choisir un centre de tri agréé |
 | `/tri` | Téléphone | Centre de tri | Vérifier le statut, accuser réception, obtenir et valider une recommandation de fin de vie |
 | `/tri/market` | Téléphone | Centre de tri | Gérer les demandes du marché : activer, désactiver, ajouter, supprimer |
+| `/transport` | Téléphone | Transporteur | Missions, enlèvement au garage : scellé, pesée, 4 contrôles ADR |
+| `/transfers/<ordre>` | Tous | Acteurs du transfert | Suivi en 4 étapes, planification, preuves, étapes signées, documents |
+| `/transfers/<ordre>/doc/etiquette` | Imprimante | Tous | Étiquette colis UN 3480 classe 9 ; aussi `ordre` et `manifeste` |
+| `/messages` | Tous | Tous les rôles | Notifications de chaque étape (in-app et mail simulé) |
 | `/public/b/<id>` | Tout téléphone | Grand public | Passeport public restreint (Annexe XIII), sans connexion |
 
-Le parcours obligatoire du sujet est **diagnostic, mise à jour du statut, transfert, réception**. Les défis 1 (télémétrie) et 3 (aide à la décision) s'y greffent.
+Le parcours obligatoire du sujet est **diagnostic, mise à jour du statut, transfert, réception**. Les défis 1 (télémétrie), 2 (logistique du transfert) et 3 (aide à la décision) s'y greffent.
+
+**Défi 2, logistique.** Le garagiste choisit le centre de tri agréé et peut demander la collecte automatique (date, créneau). À la validation du propriétaire, l'ordre passe par `ORDERED`, `SCHEDULED` (transporteur agréé ADR affecté), `PICKED_UP` (scellé, pesée, remise signée, 4 contrôles ADR) puis `RECEIVED` (le centre relit le scellé et pèse : un scellé différent est bloqué, un écart de pesée de plus de 5 % est signalé, un code de preuve de dépôt est émis). Le centre peut aussi refuser la réception : le propriétaire redirige alors la batterie vers un autre centre sans nouvel enlèvement. Chaque étape est un nœud `LogisticsStep` chaîné par empreinte SHA-256 et notifie les acteurs concernés. Règles dans `bp/logistics.py`.
 
 ---
 
@@ -108,7 +114,7 @@ Le pied de page affiche alors « Base : Neo4j ». `scripts/seed_neo4j.py` ne tou
 Pour explorer le graphe de la batterie de Doc dans Neo4j Browser (http://localhost:7474) :
 
 ```cypher
-MATCH (b:BatteryInstance {batteryId: "DLR-1985"})-[r]-(n) RETURN b, r, n
+MATCH (b:BatteryInstance {batteryId: "BAT-DOC-001"})-[r]-(n) RETURN b, r, n
 ```
 
 ---
@@ -122,7 +128,7 @@ Tous les appareils doivent être sur le **même Wi-Fi** que le PC.
    ```bash
    BP_BASE_URL=http://192.168.1.20:8000 uvicorn app:app --host 0.0.0.0 --port 8000
    ```
-3. Afficher ou imprimer le QR code de la batterie : http://192.168.1.20:8000/qr/DLR-1985.png (ou `python scripts/make_qr.py` pour régénérer les PNG de `qr/`).
+3. Afficher ou imprimer le QR code de la batterie : http://192.168.1.20:8000/qr/BAT-DOC-001.png (ou `python scripts/make_qr.py` pour régénérer les PNG de `qr/`).
 4. Le scanner avec l'appareil photo de la tablette ou du téléphone. Sans connexion, la vue publique s'ouvre ; une fois connecté, chaque rôle arrive sur sa propre vue.
 
 Le bouton « Scanner le QR code » du site utilise la caméra du navigateur, que les navigateurs n'autorisent qu'en `https://` ou sur `localhost`. En Wi-Fi local en `http`, utiliser l'appareil photo natif ou la saisie de l'identifiant. Pour le scanner intégré, exposer le site en https (par exemple `ngrok http 8000`).
@@ -135,7 +141,7 @@ Le bouton « Scanner le QR code » du site utilise la caméra du navigateur, que
 
 ```
  ESP32 : 5 entrées analogiques            PC : site Battery Passport
- GPIO 34, 35, 32, 33, 25                  FastAPI + graphe (mémoire ou Neo4j)
+ GPIO 34, 35, 32, 33, 39                  FastAPI + graphe (mémoire ou Neo4j)
  une broche par module
         |                                          ^
         |  toutes les 3 s, JSON                    |
@@ -152,7 +158,7 @@ Le bouton « Scanner le QR code » du site utilise la caméra du navigateur, que
 2. **Défaut à la demande.** Un appui sur le bouton **BOOT** de la carte lance la dérive du module 3 : sa résistance monte de 0,9 mΩ par mesure jusqu'à 6,8 mΩ. Un second appui le remet à l'état sain. C'est le bouton à presser devant le jury.
 3. **Envoi.** Toutes les 3 secondes, la carte envoie ce JSON (la LED intégrée clignote à chaque envoi) :
    ```json
-   {"batteryId": "DLR-1985", "source": "ESP32",
+   {"batteryId": "BAT-DOC-001", "source": "ESP32",
     "modules": [{"id": 1, "r_mohm": 1.23, "t": 24.6},
                 {"id": 2, "r_mohm": 1.31, "t": 24.6},
                 {"id": 3, "r_mohm": 6.80, "t": 24.6},
@@ -229,24 +235,23 @@ et mettre le même préfixe dans `sketch.ino`.
 | Garagiste (Garage Hill Valley) | `garagiste` | `garage123` | Tablette |
 | Propriétaire (Flux Motors) | `proprietaire` | `owner123` | Ordinateur |
 | Centre de tri Recyclo Nanterre (agréé) | `centretri` | `tri123` | Téléphone |
-| Centre de tri Rhône Batteries (agréé) | `centretri2` | `tri123` | Téléphone |
+| Centre de tri Rhône Batteries (agréé, sans batteries endommagées) | `centretri2` | `tri123` | Téléphone |
+| Transporteur TransBat Logistique (agréé ADR) | `transporteur` | `trans123` | Téléphone |
 
 Sur la page d'accueil, les boutons « Entrer comme ... » et « Utiliser » préremplissent le formulaire de connexion. Mots de passe en clair : preuve de concept uniquement.
 
 ---
 
-## 8. Scénario de démo (environ 2 minutes)
+## 8. Scénario de démo (environ 3 minutes)
 
-1. **Accueil au projecteur**, ESP32 allumé : la bande d'état indique « BMS ESP32 en ligne ». Appuyer sur **BOOT** : le module 3 de DLR-1985 passe en surveillance, puis en critique au troisième dépassement.
-2. **Garagiste** (tablette) : scanner `DLR-1985`. L'alerte module 3 est affichée, la baie montre le module en rouge. Cliquer sur « Signaler hors d'usage » : le formulaire est déjà prérempli.
-3. *(Optionnel, pour montrer le contrôle)* **Centre de tri** : scanner `DLR-1985`. L'écran affiche « Statut NON à jour » et la réception est refusée.
-4. **Propriétaire** (ordinateur) : la cloche affiche 1. Ouvrir la demande, choisir Recyclo Nanterre (le dépôt non agréé n'est pas sélectionnable) et valider. Le statut passe à Waste et l'ordre de transfert est créé.
-5. **Centre de tri** (téléphone) : scanner `DLR-1985`. L'écran affiche « WASTE, statut à jour ». Confirmer la réception, puis valider la recommandation (Remanufacture : remplacer le module 3).
-6. **Historique** : chaque étape est horodatée avec son acteur, l'alerte BMS comprise. Le même historique est visible dans Neo4j.
+1. **Accueil au projecteur**, ESP32 allumé : la bande d'état indique « BMS ESP32 en ligne ». Appuyer sur **BOOT** : le module 3 de BAT-DOC-001 passe en surveillance, puis en critique au troisième dépassement. La courbe de tendance montre la dérive au-dessus du seuil en pointillés.
+2. **Garagiste** (tablette) : ouvrir `BAT-DOC-001`. Le panneau de diagnostic se met à jour seul : alerte module 3 en rouge, formulaire prérempli. Choisir Recyclo Nanterre, laisser « Planifier automatiquement la collecte » activé, cliquer sur « Signaler hors d'usage ».
+3. **Propriétaire** (ordinateur) : la cloche affiche 1. Valider : le statut passe à Waste, l'ordre est créé et TransBat Logistique est affecté automatiquement.
+4. **Transporteur** (téléphone) : la mission apparaît. Saisir le scellé (`SC-104522`), le poids, le nom de la personne du garage, cocher les 4 contrôles ADR. Montrer l'étiquette UN 3480.
+5. **Centre de tri** (téléphone) : ouvrir `BAT-DOC-001`. Saisir d'abord un mauvais scellé : la réception est bloquée. Puis le bon scellé et le poids : preuve de dépôt émise. Valider la recommandation (Remanufacture : remplacer le module 3).
+6. **Historique et notifications** : chaque étape est horodatée avec son acteur ; chaque acteur a reçu ses notifications. Le manifeste imprimable reprend les étapes signées.
 
-Entre deux répétitions : « Réinitialiser la démo » en pied de page.
-
----
+Entre deux répétitions : appuyer sur BOOT pour remettre le module 3 à l'état sain, puis « Réinitialiser la démo » en pied de page.
 
 ## 9. Règles métier
 
@@ -304,7 +309,7 @@ Chaque décision est enregistrée dans le graphe avec les scores, les poids, la 
 
 | Batterie | Modèle | SOH | Statut | Particularité | Recommandation attendue |
 |---|---|---|---|---|---|
-| `DLR-1985` | FluxCap 85 kWh, NMC 811 | 71 % | Original | La batterie de Doc, reliée à l'ESP32 : module 3 hors seuil | Remanufacture |
+| `BAT-DOC-001` | FluxCap 85 kWh, NMC 811 | 71 % | Original | La batterie de Doc, reliée à l'ESP32 : module 3 hors seuil | Remanufacture |
 | `BAT-002` | FluxCap 85 kWh | 93 % | Original | Saine, pour montrer un refus du propriétaire | |
 | `BAT-003` | FluxCap 60 kWh, LFP | 64 % | Original | Usée, 1 accident | |
 | `BAT-004` | FluxCap 85 kWh | 48 % | Waste | Déjà au centre de tri | Recycle (sécurité) |
@@ -360,7 +365,8 @@ Documentation interactive générée par FastAPI : http://localhost:8000/api/doc
 
 | Méthode | Chemin | Accès | Rôle |
 |---|---|---|---|
-| POST | `/api/telemetry` | Appareil (jeton facultatif) | Reçoit un paquet BMS. Réponse : `{"ok": true, "batteryId": ..., "alerts": [...]}` ; 400 si le JSON ou la batterie est invalide, 401 si le jeton est faux |
+| POST | `/api/telemetry` | Appareil (clé machine) | Reçoit une trame BMS (objet) ou un lot de trames (liste, 200 au plus). Chaque trame met à jour les modules et, si présents, SOH et SOC, et crée un nœud `TelemetryReading`. 200 si tout est accepté, 207 si une partie du lot est rejetée, 400 si rien n'est valide, 401 sans clé valide |
+| GET | `/api/transfers/<ordre>` | Acteurs du transfert | Manifeste JSON : parties, marchandise dangereuse, preuves, étapes signées, intégrité |
 | GET | `/api/live` | Public | Télémétrie de la batterie de démonstration (page d'accueil) |
 | GET | `/api/battery/<id>/live` | Connecté | Télémétrie d'une batterie : modules, historique, alertes, état de l'appareil |
 | GET | `/api/devices` | Public | Appareils vus récemment |
@@ -370,7 +376,7 @@ Documentation interactive générée par FastAPI : http://localhost:8000/api/doc
 | GET | `/qr/<id>.png` | Public | QR code du passeport |
 | GET | `/b/<id>` | Public | Cible des QR codes : vue du rôle connecté, sinon vue publique |
 
-En-têtes acceptés par `/api/telemetry` : `X-Device-Id` (nom de l'appareil affiché) et `X-Device-Token` (si `BP_DEVICE_TOKEN` est défini).
+En-têtes acceptés par `/api/telemetry` : `X-BMS-Key` (clé machine, `bms-demo-key` par défaut ; `X-Device-Token` reste accepté) et `X-Device-Id` (nom de l'appareil affiché). Un appareil qui envoie seulement `X-Device-Id` est accepté sans clé, pour le firmware ESP32 déjà flashé ; `BP_STRICT_KEY=1` impose la clé à tous. L'ancien identifiant `DLR-1985` est accepté et redirigé vers `BAT-DOC-001`.
 
 ---
 
@@ -387,8 +393,12 @@ Toutes les options sont des variables d'environnement.
 | `NEO4J_DATABASE` | `neo4j` | Base Neo4j |
 | `BP_BASE_URL` | `http://localhost:8000` | URL encodée dans les QR codes |
 | `BP_SECRET_KEY` | valeur de développement | Clé de signature des sessions |
-| `BP_DEVICE_TOKEN` | vide | Si défini, `/api/telemetry` exige `X-Device-Token` |
-| `BP_DEMO_BATTERY` | `DLR-1985` | Batterie affichée en direct sur l'accueil |
+| `BP_BMS_KEY` | `bms-demo-key` | Clé machine attendue dans `X-BMS-Key` |
+| `BP_DEVICE_TOKEN` | vide | Remplace la clé machine si défini (compatibilité) |
+| `BP_STRICT_KEY` | vide | `1` : la clé est exigée même des appareils identifiés par `X-Device-Id` |
+| `BP_SMTP_HOST`, `BP_SMTP_PORT`, `BP_SMTP_USER`, `BP_SMTP_PASSWORD`, `BP_SMTP_FROM` | vide | Envoi réel des notifications par mail ; sans hôte, les mails sont simulés |
+| `BP_WASTE_CODE` | `16 06 05` | Code déchet porté sur les documents de transport |
+| `BP_DEMO_BATTERY` | `BAT-DOC-001` | Batterie affichée en direct sur l'accueil |
 | `MQTT_HOST` | vide (MQTT désactivé) | Broker MQTT à écouter (Wokwi, mode 3) |
 | `MQTT_PORT` | `1883` | Port MQTT |
 | `TOPIC_PREFIX` | `esilv-hack-2026/equipe-XX` | Préfixe des sujets `<préfixe>/battery/<id>/telemetry` |
@@ -402,11 +412,12 @@ Toutes les options sont des variables d'environnement.
 python -m pytest -q
 ```
 
-19 tests, tous en mode mémoire :
+30 tests, tous en mode mémoire :
 
-- `tests/test_parcours.py` : connexion, isolation des rôles, parcours complet de bout en bout, refus du propriétaire, transitions interdites, rendu de toutes les pages.
+- `tests/test_parcours.py` : connexion, isolation des rôles, parcours complet garage, propriétaire, transporteur, centre de tri (scellé, pesée, preuve de dépôt), refus du propriétaire, transitions interdites, rendu de toutes les pages.
+- `tests/test_defi2_logistique.py` : collecte automatique, centres non agréés ou non équipés refusés, notifications de chaque acteur, écart de pesée, refus à réception puis redirection, annulation, chaîne d'étapes signées et détection d'altération, documents imprimables.
 - `tests/test_defi3.py` : les 5 cas de l'algorithme, la règle de sécurité, l'effet du marché, les priorités du centre, l'intégration web, l'ajout et la suppression de demandes.
-- `tests/test_telemetrie.py` : passage nominal, surveillance puis critique sur un vrai paquet ESP32, alerte unique, anciens noms de champs et loi d'Ohm, refus des paquets invalides, vue publique sans données de santé, et contrôle qu'aucune page ne contient d'emoji ni de tiret long.
+- `tests/test_telemetrie.py` : passage nominal, surveillance puis critique sur un vrai paquet ESP32, alerte unique, anciens noms de champs et loi d'Ohm, trames invalides rejetées sans rien écrire, clé machine, lots de trames, SOH/SOC et nœuds de relevé, données de la courbe, vue publique sans données de santé, et contrôle qu'aucune page ne contient d'emoji ni de tiret long.
 
 ---
 
@@ -465,7 +476,7 @@ Le site est pensé comme le boîtier usiné de la batterie elle-même : aluminiu
 | « BMS hors ligne » alors que la carte tourne | La carte n'atteint pas le PC | Vérifier `SERVER_URL` (IP du PC, port 8000), même Wi-Fi 2,4 GHz, site lancé avec `--host 0.0.0.0`, pare-feu ouvert sur le port 8000 |
 | Le moniteur série affiche `POST erreur` | Mauvaise IP ou site arrêté | Tester `http://<IP>:8000/api/devices` depuis un téléphone sur le même Wi-Fi |
 | `POST ... -> 401` | Jeton d'appareil différent | Même valeur dans `DEVICE_TOKEN` et `BP_DEVICE_TOKEN`, ou les deux vides |
-| `POST ... -> 400` | Batterie inconnue ou JSON mal formé | `BATTERY_ID` doit exister dans les données (`DLR-1985` par défaut) |
+| `POST ... -> 400` | Batterie inconnue ou JSON mal formé | `BATTERY_ID` doit exister dans les données (`BAT-DOC-001` par défaut) |
 | La carte ne se connecte jamais au Wi-Fi | Réseau 5 GHz seul ou portail captif | Utiliser un partage de connexion 2,4 GHz |
 | Le scanner caméra refuse de s'ouvrir | Page en `http` hors `localhost` | Appareil photo natif, saisie manuelle, ou https via ngrok |
 | Les QR codes ouvrent `localhost` sur le téléphone | `BP_BASE_URL` non défini | Relancer avec `BP_BASE_URL=http://<IP>:8000` |

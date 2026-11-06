@@ -18,7 +18,7 @@ const char* WIFI_SSID  = "Wokwi-GUEST";
 const char* WIFI_PASS  = "";
 const char* MQTT_HOST  = "broker.hivemq.com";
 const int   MQTT_PORT  = 1883;
-const char* BATTERY_ID = "DLR-1985";
+const char* BATTERY_ID = "BAT-DOC-001";
 
 const int   NB_MODULES = 5;
 const int   FAULTY     = 3;       // module défectueux

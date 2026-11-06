@@ -13,14 +13,16 @@
     {{ ui.identification(p) }}
   </div>
   <div>
-    <section class="panel" id="report">
+    {% set alerts = module_alerts(p) %}
+    {# data-alerts : live.js recharge ce panneau quand un module passe hors seuil #}
+    <section class="panel" id="report" data-alerts="{{ alerts|map(attribute='index')|join(',') }}">
       <h2>{{ icon('wrench') }} Diagnostic</h2>
       {% if p.battery.status != 'Original' %}
         <div class="note info">{{ icon('info') }}<div><strong>Statut actuel : {{ p.battery.status }}</strong>Aucune action garagiste possible sur ce passeport.</div></div>
-      {% elif p.pending_request %}
-        <div class="note warn">{{ icon('clock') }}<div><strong>Demande envoyée, en attente du propriétaire</strong>{{ p.pending_request.createdAt|ts }} · {{ p.pending_request.reason }}</div></div>
+        {% if p.transfer %}<p style="margin-top:12px"><a href="{{ url_for('transfer_detail', order_uid=p.transfer.uid) }}">{{ icon('truck') }} Suivre l'ordre {{ p.transfer.uid }}</a> {{ ui.status_badge(p.transfer.state) }}</p>{% endif %}
+      {% elif p.pending_request %}{% set n = p.pending_request %}
+        <div class="note warn">{{ icon('clock') }}<div><strong>Demande envoyée, en attente du propriétaire</strong>{{ n.createdAt|ts }} · {{ n.reason }}{% if n.destinationName %}<br>Destination proposée : {{ n.destinationName }}{% endif %}{% if n.autoLogistics %}<br>Collecte automatique : {{ n.pickupDate or 'au plus tôt' }} {{ n.pickupSlot }}{% endif %}</div></div>
       {% else %}
-        {% set alerts = module_alerts(p) %}
         {% if alerts %}
           <div class="note hot" style="margin-bottom:6px">{{ icon('triangle-alert') }}<div><strong>{{ alerts|length }} {{ 'modules' if alerts|length > 1 else 'module' }} au-delà du seuil constructeur</strong>{% for m in alerts %}Module {{ m.index }} : {{ m.internalResistance_mOhm }} mΩ (max {{ m.maxInternalResistance_mOhm }} mΩ){% if not loop.last %} · {% endif %}{% endfor %}</div></div>
         {% endif %}
@@ -31,8 +33,25 @@
           <select id="fault_type" name="fault_type">
             {% for f in fault_types %}<option {% if alerts and loop.first %}selected{% endif %}>{{ f }}</option>{% endfor %}
           </select>
+          <label for="destination">Centre de tri de destination</label>
+          <select id="destination" name="destination" required>
+            {% for c in centers %}
+              <option value="{{ c.uid }}" {% if c.problems %}disabled{% elif c.uid == 'CT-NANTERRE' %}selected{% endif %}>
+                {{ c.name }} ({{ c.city }}){% if c.problems %} · {{ c.problems|join(', ') }}{% endif %}</option>
+            {% endfor %}
+          </select>
           <label for="comment">Commentaire</label>
           <textarea id="comment" name="comment" placeholder="Constat, mesures, réparation impossible">{% if alerts %}Module {{ alerts[0].index }} hors tolérance, non réparable sur site.{% endif %}</textarea>
+          <label class="toggle-row" for="auto_logistics">
+            <span><strong>Planifier automatiquement la collecte</strong><span class="small mute">Dès la validation du propriétaire, un transporteur agréé ADR est affecté.</span></span>
+            <input type="checkbox" id="auto_logistics" name="auto_logistics" value="1" checked>
+          </label>
+          <div class="auto-fields" id="auto-fields">
+            <div><label for="pickup_date">Date d'enlèvement</label>
+              <input id="pickup_date" type="date" name="pickup_date" value="{{ today }}" min="{{ today }}"></div>
+            <div><label for="pickup_slot">Créneau</label>
+              <select id="pickup_slot" name="pickup_slot">{% for s in slots %}<option>{{ s }}</option>{% endfor %}</select></div>
+          </div>
           <button class="btn danger block big" style="margin-top:16px" type="submit">{{ icon('send') }} Signaler hors d'usage</button>
         </form>
       {% endif %}

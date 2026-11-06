@@ -36,8 +36,23 @@
     <span class="badge {{ 'st-Waste' if alerts else 'st-RECEIVED' }}" data-summary>{{ (alerts|length ~ (' modules hors seuil' if alerts|length > 1 else ' module hors seuil')) if alerts else 'Modules dans les tolérances' }}</span>
   </div>
   {{ bay_cells(p.modules, live) }}
+  {{ trend_chart(p) }}
   {{ device_strip(live) }}
 </section>
+{% endmacro %}
+
+{# Courbe de tendance : résistance par module dans le temps, seuil constructeur en pointillés.
+   Dessinée par live.js à partir des relevés BMS, rafraîchie toutes les 2 s. #}
+{% macro trend_chart(p) %}
+<div class="trend" data-trend>
+  <div class="head">
+    <h3>{{ icon('activity') }} Tendance de la résistance interne</h3>
+    <span class="tiny mute" data-trend-meta>En attente de relevés BMS</span>
+  </div>
+  <svg viewBox="0 0 640 220" role="img" aria-label="Résistance interne par module dans le temps, avec le seuil constructeur">
+    <text class="empty" x="320" y="115" text-anchor="middle">Les courbes apparaissent dès les premiers relevés.</text>
+  </svg>
+</div>
 {% endmacro %}
 
 {% macro bay_cells(modules, live) %}
@@ -217,19 +232,41 @@
 </section>
 {% endmacro %}
 
+{# Suivi en 4 étapes : ordre créé, transporteur affecté, enlevée, réceptionnée #}
+{% macro transfer_track(t) %}
+{% set rank = {'ORDERED': 0, 'SCHEDULED': 1, 'PICKED_UP': 2, 'RECEIVED': 3, 'REFUSED': 3, 'CANCELLED': -1}[t.state] %}
+{% set stages = [('Ordre créé', t.createdAt|ts), ('Transporteur affecté', t.carrierName or ''),
+                 ('Enlevée, en transit', t.pickedUpAt|ts if t.pickedUpAt else ''),
+                 ('Refusée' if t.state == 'REFUSED' else 'Réceptionnée', t.receivedAt|ts if t.receivedAt else (t.refusedAt|ts if t.refusedAt else ''))] %}
+<ol class="track" aria-label="Suivi de l'ordre {{ t.uid }}">
+  {% for label, sub in stages %}
+    {% set cls = 'bad' if (t.state == 'REFUSED' and loop.index0 == 3) else ('done' if loop.index0 <= rank else ('now' if loop.index0 == rank + 1 and rank >= 0 else '')) %}
+    <li class="{{ cls }}">{{ label }}{% if sub and cls in ('done', 'bad') %}<small>{{ sub }}</small>{% endif %}</li>
+  {% endfor %}
+</ol>
+{% if t.state == 'CANCELLED' %}<p class="small mute" style="margin-top:8px">Ordre annulé{% if t.cancelReason %} : {{ t.cancelReason }}{% endif %}.</p>{% endif %}
+{% endmacro %}
+
 {% macro transfer_card(p) %}
 {% if p.transfer %}{% set t = p.transfer %}
 <section class="panel">
   <h2>{{ icon('truck') }} Transfert et logistique</h2>
-  <dl class="kv">
-    <dt>Ordre</dt><dd>{{ t.uid }} {{ status_badge(t.state) }}</dd>
+  {{ transfer_track(t) }}
+  <dl class="kv" style="margin-top:16px">
+    <dt>Ordre</dt><dd><a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ t.uid }}</a> {{ status_badge(t.state) }}</dd>
     <dt>Départ</dt><dd>{{ t.fromName or 'Non renseigné' }}</dd>
     <dt>Destination</dt><dd>{{ t.toName }}{% if t.toAgreed %} <span class="badge st-APPROVED">agréé</span>{% endif %}</dd>
-    <dt>Créé le</dt><dd>{{ t.createdAt|ts }}</dd>
-    {% if t.receivedAt %}<dt>Reçu le</dt><dd>{{ t.receivedAt|ts }}</dd>{% endif %}
-    <dt>Masse <span class="attr">#10</span></dt><dd>{{ p.battery.weightKg or 450 }} kg, manutention lourde</dd>
-    <dt>Transport <span class="attr">#34</span></dt><dd>Matière dangereuse ADR, UN 3480, classe 9</dd>
+    <dt>Transporteur</dt><dd>{{ t.carrierName or 'À affecter' }}{% if t.pickupDate %}, enlèvement le {{ t.pickupDate }} {{ t.pickupSlot or '' }}{% endif %}</dd>
+    {% if t.sealNumber %}<dt>Scellé</dt><dd><code>{{ t.sealNumber }}</code>, {{ t.pickupWeightKg }} kg à l'enlèvement</dd>{% endif %}
+    {% if t.receiptCode %}<dt>Preuve de dépôt</dt><dd><span class="receipt">{{ t.receiptCode }}</span> · {{ t.receivedAt|ts }}</dd>{% endif %}
+    {% if t.refusalReason %}<dt>Refus</dt><dd>{{ t.refusalReason }}</dd>{% endif %}
+    <dt>Masse <span class="attr">#10</span></dt><dd>{{ t.declaredWeightKg or (p.model.weight_kg if p.model else none) or 450 }} kg, manutention lourde</dd>
+    <dt>Transport <span class="attr">#34</span></dt><dd>{{ t.unDesignation or 'UN 3480, batteries lithium-ion, classe 9' }}{% if t.adrPacking %} · emballage {{ t.adrPacking }}{% endif %}</dd>
   </dl>
+  <div class="docs" style="margin-top:14px">
+    <a class="btn ghost" href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ icon('arrow-right') }} Suivi détaillé</a>
+    <a class="btn ghost" href="{{ url_for('transfer_print', order_uid=t.uid, doc_type='etiquette') }}" target="_blank">{{ icon('qr-code') }} Étiquette UN 3480</a>
+  </div>
 </section>
 {% endif %}
 {% endmacro %}
@@ -286,7 +323,7 @@
   <form action="{{ url_for('scan') }}" method="get" style="margin-top:12px">
     <label for="code">Identifiant de la batterie</label>
     <div class="field-row">
-      <input id="code" name="code" placeholder="DLR-1985" autocapitalize="characters" autocomplete="off" required>
+      <input id="code" name="code" placeholder="BAT-DOC-001" autocapitalize="characters" autocomplete="off" required>
       <button class="btn" type="submit">Ouvrir {{ icon('arrow-right') }}</button>
     </div>
   </form>

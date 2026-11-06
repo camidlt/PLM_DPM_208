@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "_macros.html" as ui with context %}
+{% block title %}Transporteur · Battery Passport{% endblock %}
+{% block wrapclass %}narrow{% endblock %}
+{% block content %}
+<div class="stack">
+  <div>
+    <h1>Missions</h1>
+    <p class="mute" style="margin-top:8px">{{ user.display }}. Transport ADR classe 9 : chaque enlèvement est scellé, pesé et signé, puis vérifié à l'arrivée par le centre de tri.</p>
+  </div>
+
+  <section class="panel">
+    <h2>{{ icon('truck') }} Missions en cours <span class="badge {{ 'st-SCHEDULED' if active else 'st-Original' }}" style="margin-left:4px">{{ active|length }}</span></h2>
+    {% for t in active %}
+      <div style="padding:14px 0; border-top:1px solid var(--rim)">
+        <div class="row between">
+          <a href="{{ url_for('transfer_detail', order_uid=t.uid) }}" class="etched" style="color:var(--ink); text-decoration:none">{{ t.batteryId }}</a>
+          {{ ui.status_badge(t.state) }}
+        </div>
+        <div class="small soft" style="margin-top:4px">{% if t.state == 'SCHEDULED' %}Enlèvement le {{ t.pickupDate }} {{ t.pickupSlot or '' }} chez {{ t.fromName }}{% else %}Sous votre garde, scellé <code>{{ t.sealNumber }}</code>{% endif %}, vers {{ t.toName }}</div>
+        <div class="tiny mute">Ordre {{ t.uid }}</div>
+        <a class="btn {{ 'primary' if t.state == 'SCHEDULED' else 'ghost' }} block" style="margin-top:10px" href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ icon('arrow-right') }} {{ "Enlever la batterie" if t.state == 'SCHEDULED' else 'Voir la livraison' }}</a>
+      </div>
+    {% else %}<p class="mute">Aucune mission en cours. Le propriétaire du passeport vous affecte les enlèvements.</p>{% endfor %}
+  </section>
+
+  {{ ui.scan_box(none, 'Scanner une batterie à enlever') }}
+
+  <section class="panel">
+    <h2>{{ icon('history') }} Missions terminées</h2>
+    {% if done %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Ordre</th><th>Batterie</th><th>Destination</th><th>État</th></tr></thead>
+      <tbody>
+      {% for t in done %}
+      <tr><td><a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ t.uid }}</a></td><td>{{ t.batteryId }}</td><td>{{ t.toName }}</td><td>{{ ui.status_badge(t.state) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p class="mute">Aucune pour le moment.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}{% include "_scan_scripts.html" %}{% endblock %}

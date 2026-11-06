@@ -1,0 +1,26 @@
+{% extends "doc_base.html" %}
+{% import "_doc_macros.html" as d with context %}
+{% block title %}Ordre de transfert {{ doc.order.uid }}{% endblock %}
+{% block doc %}
+{{ d.head(doc, 'Ordre de transfert') }}
+<section class="grid">
+  {{ d.party('Producteur, responsable du passeport', doc.parties.producer) }}
+  {{ d.party("Lieu d'enlèvement (détenteur)", doc.parties.holder) }}
+  {{ d.party('Transporteur', doc.parties.carrier) }}
+  {{ d.party('Centre de tri destinataire', doc.parties.destination) }}
+</section>
+{{ d.goods(doc) }}
+<div class="box">
+  <h3>Enlèvement</h3>
+  <div>Date : <strong>{{ doc.order.pickupDate or 'à planifier' }}</strong> {{ doc.order.pickupSlot or '' }}</div>
+  {% if doc.order.instructions %}<div>Consignes : {{ doc.order.instructions }}</div>{% endif %}
+  {% if doc.order.ownerComment %}<div>Commentaire du propriétaire : {{ doc.order.ownerComment }}</div>{% endif %}
+  <div class="small mute" style="margin-top:6px">Le centre de tri refusera la batterie si le scellé posé à l'enlèvement est absent, rompu ou différent.</div>
+</div>
+<section class="grid three">
+  <div class="box sign"><h3>Remis par (garage)</h3>{{ doc.custody.handedOverBy or '' }}<div class="small mute">{{ doc.order.pickedUpAt|ts if doc.order.pickedUpAt else '' }}</div></div>
+  <div class="box sign"><h3>Transporteur</h3>{{ doc.parties.carrier.name if doc.parties.carrier else '' }}<div class="small mute">{{ ('Scellé ' ~ doc.custody.sealNumber) if doc.custody.sealNumber else '' }}</div></div>
+  <div class="box sign"><h3>Reçu par (centre de tri)</h3>{{ doc.parties.destination.name if doc.order.receivedAt else '' }}<div class="small mute">{{ doc.order.receivedAt|ts if doc.order.receivedAt else '' }}</div></div>
+</section>
+<p class="small mute">Signatures électroniques : chaque étape est enregistrée dans le Battery Passport par l'acteur connecté (voir le manifeste). Document à conserver avec la batterie pendant le transport.</p>
+{% endblock %}

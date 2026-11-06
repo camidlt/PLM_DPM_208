@@ -80,13 +80,17 @@
     }
     function kick() { if (!running && !reduce) { running = true; last = performance.now(); requestAnimationFrame(loop); } }
 
+    var trend = root.querySelector("[data-trend]");
+
     function apply(data) {
       if (!data || !data.modules) return;
-      var over = 0;
+      var over = 0, overIdx = [];
       data.modules.forEach(function (m) {
         if (cells[m.index]) cells[m.index].update(m);
-        if (m.r !== null && m.rmax && m.r > m.rmax) over++;
+        if (m.r !== null && m.rmax && m.r > m.rmax) { over++; overIdx.push(m.index); }
       });
+      if (trend) drawTrend(trend, data);
+      refreshReport(overIdx.join(","));
       if (summary) {
         summary.textContent = over ? over + (over > 1 ? " modules hors seuil" : " module hors seuil") : "Modules dans les tolérances";
         summary.className = "badge " + (over ? "st-Waste" : "st-RECEIVED");
@@ -113,4 +117,90 @@
     poll();
     setInterval(poll, 2000);
   });
+
+  // Garagiste : quand la liste des modules hors seuil change, le panneau de diagnostic
+  // (alerte rouge et formulaire prérempli) est rechargé, sauf si l'utilisateur est en train de saisir.
+  function refreshReport(overNow) {
+    var report = document.getElementById("report");
+    if (!report || report.dataset.alerts === undefined || report.dataset.alerts === overNow) return;
+    var active = document.activeElement;
+    if (active && report.contains(active) && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
+    report.dataset.alerts = overNow;   // une seule fois par changement
+    fetch(window.location.pathname, { credentials: "same-origin" })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) {
+        if (!html) return;
+        var fresh = new DOMParser().parseFromString(html, "text/html").getElementById("report");
+        if (fresh) { report.replaceWith(fresh); document.dispatchEvent(new Event("report:refreshed")); }
+      }).catch(function () {});
+  }
+
+  // Courbe de tendance : une polyligne par module, seuil constructeur en pointillés
+  var NS = "http://www.w3.org/2000/svg";
+  var SERIES = ["#e6edf3", "#12abdb", "#7790a8", "#4f9fd6", "#afc0cf", "#2f8fb8"];
+  var W = 640, H = 220, L = 40, R = 40, T = 14, B = 26;
+
+  function el(name, attrs, text) {
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  // étiquette d'axe : la date si les relevés couvrent plusieurs jours, sinon l'heure
+  function stamp(ts, multiDay) {
+    var p = String(ts || "").split("T"), d = (p[0] || "").split("-");
+    return multiDay ? d[2] + "/" + d[1] + "/" + d[0] : (p[1] || "").slice(0, 8);
+  }
+
+  function drawTrend(box, data) {
+    var svg = box.querySelector(":scope > svg");   // pas l'icône du titre
+    var mods = data.modules.filter(function (m) { return m.points && m.points.length; });
+    var meta = box.querySelector("[data-trend-meta]");
+    if (!mods.length) return;
+    var n = Math.max.apply(null, mods.map(function (m) { return m.points.length; }));
+    var rmax = Math.max.apply(null, data.modules.map(function (m) { return m.rmax || 0; }));
+    var top = rmax * 1.2;
+    mods.forEach(function (m) { m.points.forEach(function (p) { if (p.r > top) top = p.r; }); });
+    top = Math.ceil(top * 1.1 * 2) / 2;
+    var x = function (i, len) { return L + (len > 1 ? i / (len - 1) : 1) * (W - L - R); };
+    var y = function (r) { return T + (1 - r / top) * (H - T - B); };
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var grid = el("g", { "class": "grid" }), axis = el("g", { "class": "axis" });
+    var step = top <= 3 ? 0.5 : (top <= 8 ? 1 : 2);
+    for (var v = 0; v <= top + 1e-9; v += step) {
+      grid.appendChild(el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v) }));
+      axis.appendChild(el("text", { x: L - 6, y: y(v) + 3, "text-anchor": "end" }, v.toFixed(v % 1 ? 1 : 0)));
+    }
+    var first = mods[0].points[0], lastP = mods[0].points[mods[0].points.length - 1];
+    var multiDay = String(first.ts).slice(0, 10) !== String(lastP.ts).slice(0, 10);
+    axis.appendChild(el("text", { x: L, y: H - 6 }, stamp(first.ts, multiDay)));
+    axis.appendChild(el("text", { x: W - R, y: H - 6, "text-anchor": "end" }, stamp(lastP.ts, multiDay)));
+    axis.appendChild(el("text", { x: 4, y: T + 2 }, "mΩ"));
+    svg.appendChild(grid); svg.appendChild(axis);
+
+    if (rmax) {
+      svg.appendChild(el("line", { "class": "limit", x1: L, x2: W - R, y1: y(rmax), y2: y(rmax) }));
+      svg.appendChild(el("text", { "class": "limit-label", x: L + 6, y: y(rmax) - 5 }, "seuil max " + rmax + " mΩ"));
+    }
+    var ends = el("g", { "class": "end" }), labels = [];
+    mods.forEach(function (m, k) {
+      var hot = m.health === "CRITICAL" || (m.rmax && m.r > m.rmax);
+      var color = hot ? "var(--hot)" : (m.health === "WARNING" ? "var(--warn)" : SERIES[k % SERIES.length]);
+      var len = m.points.length, off = n - len;
+      var pts = m.points.map(function (p, i) { return x(i + off, n).toFixed(1) + "," + y(p.r).toFixed(1); }).join(" ");
+      svg.appendChild(el("polyline", { "class": "series" + (hot ? " over" : ""), points: pts, stroke: color }));
+      var lp = m.points[len - 1];
+      ends.appendChild(el("circle", { cx: x(n - 1, n), cy: y(lp.r), r: 3, fill: color }));
+      labels.push({ y: y(lp.r) + 3, color: color, text: "M" + m.index });
+    });
+    // étiquettes de fin de courbe : écartées d'au moins 11 px pour rester lisibles
+    labels.sort(function (a, b) { return a.y - b.y; });
+    for (var i = 1; i < labels.length; i++) {
+      if (labels[i].y - labels[i - 1].y < 11) labels[i].y = labels[i - 1].y + 11;
+    }
+    labels.forEach(function (lb) { ends.appendChild(el("text", { x: W - R + 8, y: lb.y, fill: lb.color }, lb.text)); });
+    svg.appendChild(ends);
+    if (meta) meta.textContent = n + " relevés par module" + (data.readings ? " · " + data.readings + " trames dans le graphe" : "");
+  }
 })();

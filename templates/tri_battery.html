@@ -23,18 +23,44 @@
 
 <section class="panel" style="margin-top:20px">
   <h2>{{ icon('package-check') }} Réception</h2>
+  {% if t %}{{ ui.transfer_track(t) }}<div style="height:14px"></div>{% endif %}
   {% if t and t.state == 'RECEIVED' %}
-    <div class="note ok">{{ icon('package-check') }}<div><strong>Réceptionnée</strong>par {{ t.toName }} le {{ t.receivedAt|ts }} (ordre {{ t.uid }})</div></div>
-  {% elif t and t.state == 'ORDERED' and t.toUid == user.actor_uid and p.battery.status == 'Waste' %}
-    <p class="small soft">Ordre de transfert <strong>{{ t.uid }}</strong> depuis {{ t.fromName or 'origine non renseignée' }}.</p>
-    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}" style="margin-top:14px">
-      <button class="btn primary block big" type="submit">{{ icon('package-check') }} Confirmer la réception</button>
-    </form>
-  {% elif t and t.state == 'ORDERED' %}
+    <div class="note ok">{{ icon('package-check') }}<div><strong>Réceptionnée</strong>par {{ t.toName }} le {{ t.receivedAt|ts }} (ordre {{ t.uid }}){% if t.receiptCode %}<br>Preuve de dépôt : <span class="receipt">{{ t.receiptCode }}</span>{% endif %}{% if t.anomaly %}<br>{{ t.anomaly }}{% endif %}</div></div>
+  {% elif t and t.toUid != user.actor_uid and t.state not in ('CANCELLED', 'REFUSED') %}
     <div class="note warn">{{ icon('repeat-2') }}<div><strong>Mauvais destinataire</strong>Cette batterie est attendue par {{ t.toName }}, pas par votre centre.</div></div>
+  {% elif t and t.state == 'PICKED_UP' and p.battery.status == 'Waste' %}
+    <p class="small soft">Ordre <strong>{{ t.uid }}</strong> · transporteur {{ t.carrierName }} · depuis {{ t.fromName or 'origine non renseignée' }}. Vérifiez le scellé et pesez la batterie.</p>
+    <form method="post" action="{{ url_for('tri_receive', battery_id=p.battery.batteryId) }}" style="margin-top:6px">
+      <label for="seal">N° de scellé lu sur l'emballage</label>
+      <input id="seal" name="seal" placeholder="SC-104522" autocapitalize="characters" autocomplete="off" required>
+      <label for="weight">Poids pesé (kg)</label>
+      <input id="weight" name="weight" type="number" step="0.1" min="1" inputmode="decimal" placeholder="{{ t.pickupWeightKg }}" required>
+      <ul class="checks">
+        {% for key, label in reception_checks.items() %}<li><label><input type="checkbox" name="check_{{ key }}" value="1"> {{ label }}</label></li>{% endfor %}
+      </ul>
+      <label for="rcmt">Commentaire <span class="mute">(optionnel)</span></label>
+      <input id="rcmt" name="comment" placeholder="Stockée zone B, rack 4">
+      <button class="btn primary block big" style="margin-top:16px" type="submit">{{ icon('package-check') }} Confirmer la réception</button>
+    </form>
+    <details style="margin-top:14px">
+      <summary class="small">{{ icon('triangle-alert') }} Anomalie : refuser la réception</summary>
+      <form method="post" action="{{ url_for('tri_refuse', battery_id=p.battery.batteryId) }}" style="margin-top:8px"
+            onsubmit="return confirm('Refuser la réception ? La batterie restera sous la garde du transporteur.')">
+        <label for="refuse-reason">Motif du refus</label>
+        <input id="refuse-reason" name="reason" placeholder="Scellé rompu, fuite d'électrolyte" required>
+        <button class="btn danger block" style="margin-top:12px" type="submit">{{ icon('ban') }} Refuser la réception</button>
+      </form>
+    </details>
+  {% elif t and t.state in ('ORDERED', 'SCHEDULED') %}
+    <div class="note warn">{{ icon('clock') }}<div><strong>En attente de l'enlèvement</strong>{% if t.state == 'SCHEDULED' %}{{ t.carrierName }} enlèvera la batterie chez {{ t.fromName }} le {{ t.pickupDate }} {{ t.pickupSlot or '' }}.{% else %}Le propriétaire doit encore affecter un transporteur.{% endif %} La réception n'est possible qu'après l'enlèvement, scellé posé.</div></div>
+  {% elif t and t.state == 'REFUSED' %}
+    <div class="note hot">{{ icon('ban') }}<div><strong>Réception refusée</strong>{{ t.refusalReason }}. La batterie reste chez {{ t.carrierName }}, en attente de redirection.</div></div>
+  {% elif p.battery.status == 'Waste' and (p.location or {}).get('uid') == user.actor_uid %}
+    <div class="note ok">{{ icon('package-check') }}<div><strong>Déjà dans votre centre</strong>Batterie réceptionnée avant la mise en service du suivi logistique.</div></div>
   {% else %}
     <div class="note warn">{{ icon('circle-help') }}<div><strong>Aucun ordre de transfert</strong>Le propriétaire n'a pas encore organisé le transfert de cette batterie.</div></div>
   {% endif %}
+  {% if t and t.toUid == user.actor_uid %}<p style="margin-top:14px"><a href="{{ url_for('transfer_detail', order_uid=t.uid) }}">{{ icon('file-text') }} Ordre, étiquette UN 3480 et manifeste</a></p>{% endif %}
 </section>
 
 {% include "_decision_panel.html" %}

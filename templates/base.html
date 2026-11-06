@@ -26,6 +26,7 @@
           {% if user.role == 'proprietaire' %}
             <a class="bell" href="{{ url_for('owner_home') }}#inbox" aria-label="Demandes en attente : {{ pending_count }}">{{ icon('bell', 'lg') }}<span class="count" data-n="{{ pending_count }}">{{ pending_count }}</span></a>
           {% endif %}
+          <a href="{{ url_for('messages') }}" aria-label="Notifications : {{ unread_count }} non lues">{{ icon('send') }}<span class="lbl">Notifications</span><span class="navcount" data-unread data-n="{{ unread_count }}">{{ unread_count }}</span></a>
           <a href="{{ url_for('logout') }}">{{ icon('log-out') }}<span class="lbl">Déconnexion</span></a>
         {% else %}
           {% block publicnav %}

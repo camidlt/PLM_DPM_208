@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · Battery Passport</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <style>
+    @font-face { font-family: "Michroma"; src: url("{{ url_for('static', filename='fonts/michroma-latin-400-normal.woff2') }}") format("woff2"); font-display: swap; }
+    @font-face { font-family: "Archivo"; src: url("{{ url_for('static', filename='fonts/archivo-latin-wdth-normal.woff2') }}") format("woff2-variations"); font-weight: 100 900; font-display: swap; }
+    :root { --ink: #13202c; --mute: #4a5d70; --rule: #c9d2da; --hot: #b8320f; --paper: #fff; --desk: #e6edf3; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--desk); color: var(--ink); font: 400 14px/1.45 "Archivo", Arial, sans-serif; font-variant-numeric: tabular-nums; }
+    .bar { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 14px 16px; }
+    .bar button, .bar a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 3px; border: 1px solid #0070ad; font: 600 14px "Archivo", Arial, sans-serif; text-decoration: none; cursor: pointer; }
+    .bar button { background: #0070ad; color: #fff; } .bar a { background: #fff; color: #0070ad; }
+    .doc { background: var(--paper); max-width: 800px; margin: 0 auto 32px; padding: 36px 40px; box-shadow: 0 2px 16px rgba(19,32,44,.12); }
+    h1, h2, h3 { margin: 0; }
+    h1 { font: 400 1.35rem/1.2 "Michroma", sans-serif; letter-spacing: .04em; }
+    h3 { font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mute); margin-bottom: 6px; }
+    .head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 14px; margin-bottom: 18px; }
+    .head .meta { color: var(--mute); font-size: .85rem; margin-top: 6px; }
+    .head .qr svg { width: 104px; height: 104px; }
+    .id { font: 400 1rem "Michroma", sans-serif; letter-spacing: .06em; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .grid.three { grid-template-columns: 1fr 1fr 1fr; }
+    .box { border: 1px solid var(--rule); border-radius: 3px; padding: 12px 14px; margin-bottom: 12px; }
+    .box.sign { min-height: 92px; }
+    .small { font-size: .82rem; } .mute { color: var(--mute); }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    th { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); }
+    .hash { font: .74rem/1.3 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+    .receipt-code { font: 400 1.8rem "Michroma", sans-serif; letter-spacing: .1em; margin: 6px 0; }
+    .hot { color: var(--hot); }
+    /* étiquette colis UN 3480 */
+    .label { max-width: 560px; border: 3px solid #000; padding: 22px; }
+    .label-top { display: flex; justify-content: space-between; align-items: center; }
+    .label .un { font: 900 3rem/1 Arial, sans-serif; letter-spacing: .02em; }
+    .label .class9 { width: 110px; height: 110px; }
+    .label-marking { margin: 14px 0; padding: 8px 0; border-top: 2px solid #000; border-bottom: 2px solid #000; font: 800 1.05rem Arial, sans-serif; text-align: center; letter-spacing: .03em; }
+    .label-mid { display: grid; grid-template-columns: 140px 1fr; gap: 16px; align-items: center; }
+    .label-mid .qr svg { width: 140px; height: 140px; }
+    .label-id { font: 400 1.25rem "Michroma", sans-serif; letter-spacing: .05em; margin: 2px 0 4px; }
+    .label-dest { margin-top: 16px; border: 2px solid #000; padding: 10px 12px; }
+    .label-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; font-size: .9rem; }
+    @media (max-width: 640px) { .doc { padding: 20px 16px; } .grid, .grid.three { grid-template-columns: 1fr; } .label-mid { grid-template-columns: 1fr; } }
+    @media print { body { background: #fff; } .bar { display: none; } .doc { box-shadow: none; margin: 0; max-width: none; } @page { margin: 14mm; } }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <button type="button" onclick="window.print()">Imprimer ou enregistrer en PDF</button>
+    <a href="{{ url_for('transfer_detail', order_uid=doc.order.uid) }}">Retour au suivi du transfert</a>
+  </div>
+  <main class="doc {% block docclass %}{% endblock %}">{% block doc %}{% endblock %}</main>
+</body>
+</html>

@@ -35,6 +35,14 @@ class MemoryRepo:
                           for label, uid, props in seed_data.NODES}
             self.rels = [list(r) for r in seed_data.RELS]
             self.series = {}  # (batteryId, index de module) -> mesures récentes
+            # historique BMS de démonstration : relevés (:TelemetryReading) du jeu de données
+            readings = sorted(((a, self.nodes[b]) for a, r, b in self.rels if r == "HAS_TELEMETRY"),
+                              key=lambda x: x[1]["at"])
+            for bat_uid, rd in readings:
+                bid = self.nodes[bat_uid]["batteryId"]
+                for idx, r, t in zip(rd["moduleIndexes"], rd["resistances"], rd["temperatures"]):
+                    self.series.setdefault((bid, idx), deque(maxlen=telemetry.HISTORY_POINTS)).append(
+                        dict(ts=rd["at"], r=r, v=None, i=None, t=t))
             for n in self.nodes.values():
                 if n["_label"] == "Module":
                     n.setdefault("health", telemetry.health_from_value(
@@ -122,15 +130,20 @@ class MemoryRepo:
             )
 
     def _latest_transfer(self, battery_uid):
+        # l'ordre en vigueur : celui qui n'a pas été remplacé (redirection), puis le plus récent
         orders = sorted(self._in(battery_uid, "FOR", "TransferOrder"),
-                        key=lambda t: t["createdAt"], reverse=True)
-        if not orders:
-            return None
-        t = orders[0]
+                        key=lambda t: (not t.get("supersededBy"), t["createdAt"]), reverse=True)
+        return self._transfer_dict(orders[0]) if orders else None
+
+    def _transfer_dict(self, t):
+        b = self._out(t["uid"], "FOR")[0]
         to = self._out(t["uid"], "TO")[0]
         frm = (self._out(t["uid"], "FROM") or [{}])[0]
-        return dict(self._clean(t), toUid=to["uid"], toName=to["name"], toAgreed=to.get("agreed"),
-                    fromName=frm.get("name"))
+        car = (self._out(t["uid"], "ASSIGNED_TO") or [{}])[0]
+        return dict(self._clean(t), batteryId=b["batteryId"], batteryStatus=b["status"],
+                    toUid=to["uid"], toName=to["name"], toAgreed=to.get("agreed"),
+                    fromUid=frm.get("uid"), fromName=frm.get("name"),
+                    carrierUid=car.get("uid"), carrierName=car.get("name"))
 
     def get_history(self, battery_id):
         with self.lock:
@@ -144,8 +157,10 @@ class MemoryRepo:
         battery = self._out(n["uid"], "ABOUT")[0]
         sender = (self._in(n["uid"], "SENT") or [{}])[0]
         op = self._out(n["uid"], "ADDRESSED_TO")[0]
-        return dict(self._clean(n), batteryId=battery["batteryId"],
-                    senderName=sender.get("name"), operatorUid=op["uid"])
+        dest = self.nodes.get(n.get("destinationUid") or "") or {}
+        return dict(self._clean(n), batteryId=battery["batteryId"], senderUid=sender.get("uid"),
+                    senderName=sender.get("name"), operatorUid=op["uid"],
+                    destinationName=dest.get("name"))
 
     def get_notification(self, notif_uid):
         with self.lock:
@@ -165,11 +180,87 @@ class MemoryRepo:
 
     def list_transfers_to(self, center_uid):
         with self.lock:
-            out = []
-            for t in self._in(center_uid, "TO", "TransferOrder"):
-                b = self._out(t["uid"], "FOR")[0]
-                out.append(dict(self._clean(t), batteryId=b["batteryId"], status=b["status"]))
+            out = [dict(self._transfer_dict(t), status=self._out(t["uid"], "FOR")[0]["status"])
+                   for t in self._in(center_uid, "TO", "TransferOrder")]
             return sorted(out, key=lambda t: t["createdAt"], reverse=True)
+
+    # --- défi 2 : acteurs, transferts, étapes signées, messages ---------------------
+    def get_actor(self, uid):
+        with self.lock:
+            n = self.nodes.get(uid)
+            return self._clean(n) if n and n["_label"] == "Actor" else None
+
+    def add_event(self, battery_id, etype, actor_uid, details):
+        with self.lock:
+            b = self._battery(battery_id)
+            if b is not None:
+                self._event(b["uid"], etype, actor_uid, details)
+
+    def get_transfer(self, order_uid):
+        with self.lock:
+            t = self.nodes.get(order_uid)
+            return self._transfer_dict(t) if t and t["_label"] == "TransferOrder" else None
+
+    def list_transfers(self, carrier_uid=None):
+        with self.lock:
+            out = [self._transfer_dict(t) for t in self.nodes.values() if t["_label"] == "TransferOrder"]
+            if carrier_uid:
+                out = [t for t in out if t["carrierUid"] == carrier_uid]
+            return sorted(out, key=lambda t: t["createdAt"], reverse=True)
+
+    def create_transfer(self, battery_id, from_uid, to_uid, props, carrier_uid=None):
+        with self.lock:
+            b = self._battery(battery_id)
+            uid = self._add("TransferOrder", new_uid("TO"), createdAt=now(), **props)
+            self.rels += [[uid, "FOR", b["uid"]], [uid, "TO", to_uid]]
+            if from_uid:
+                self.rels.append([uid, "FROM", from_uid])
+            if carrier_uid:
+                self.rels.append([uid, "ASSIGNED_TO", carrier_uid])
+            return uid
+
+    def update_transfer(self, order_uid, props, carrier_uid=None, location_uid=None):
+        """Met à jour l'ordre ; change le transporteur affecté et/ou la localisation de la batterie."""
+        with self.lock:
+            self.nodes[order_uid].update(props)
+            if carrier_uid:
+                self.rels = [r for r in self.rels if not (r[0] == order_uid and r[1] == "ASSIGNED_TO")]
+                self.rels.append([order_uid, "ASSIGNED_TO", carrier_uid])
+            if location_uid:
+                b = self._out(order_uid, "FOR")[0]
+                self.rels = [r for r in self.rels if not (r[0] == b["uid"] and r[1] == "LOCATED_AT")]
+                self.rels.append([b["uid"], "LOCATED_AT", location_uid])
+
+    def add_transfer_step(self, order_uid, actor_uid, step):
+        with self.lock:
+            uid = self._add("LogisticsStep", new_uid("STEP"), **step)
+            self.rels += [[order_uid, "HAS_STEP", uid], [actor_uid, "PERFORMED", uid]]
+            return uid
+
+    def get_transfer_steps(self, order_uid):
+        with self.lock:
+            return sorted((self._clean(s) for s in self._out(order_uid, "HAS_STEP")),
+                          key=lambda s: s["seq"])
+
+    def add_message(self, to_uid, props):
+        with self.lock:
+            uid = self._add("Message", new_uid("MSG"), read=False, at=now(), **props)
+            self.rels.append([uid, "SENT_TO", to_uid])
+            return uid
+
+    def list_messages(self, actor_uid):
+        with self.lock:
+            return sorted((self._clean(m) for m in self._in(actor_uid, "SENT_TO", "Message")),
+                          key=lambda m: m["at"], reverse=True)
+
+    def unread_count(self, actor_uid):
+        with self.lock:
+            return sum(1 for m in self._in(actor_uid, "SENT_TO", "Message") if not m.get("read"))
+
+    def mark_messages_read(self, actor_uid):
+        with self.lock:
+            for m in self._in(actor_uid, "SENT_TO", "Message"):
+                m["read"] = True
 
     # --- défi 3 : demandes du marché et décisions ------------------------------
     def list_demands(self):
@@ -259,13 +350,26 @@ class MemoryRepo:
             return uid
 
     # --- défi 1 : télémétrie BMS ------------------------------------------------
-    def record_telemetry(self, battery_id, readings, ts=None, source="BMS"):
-        """Écrit les mesures d'un paquet BMS. Renvoie la liste des alertes ouvertes."""
+    def record_telemetry(self, battery_id, readings, ts=None, source="BMS", soh=None, soc=None):
+        """Écrit une trame BMS : modules, SOH/SOC, et un nœud (:TelemetryReading) d'historique.
+        Renvoie la liste des alertes ouvertes."""
         ts = ts or now()
         with self.lock:
             b = self._battery(battery_id)
             if b is None:
                 raise telemetry.TelemetryError(f"Batterie {battery_id} inconnue.")
+            props = dict(at=ts, source=source, moduleIndexes=[rd["index"] for rd in readings],
+                         resistances=[rd["r"] for rd in readings],
+                         temperatures=[rd["t"] for rd in readings])
+            props.update({k: v for k, v in (("soh", soh), ("soc", soc)) if v is not None})
+            reading = self._add("TelemetryReading", new_uid("TEL"), **props)
+            self.rels.append([b["uid"], "HAS_TELEMETRY", reading])
+            self._prune_readings(b["uid"])
+            if soh is not None or soc is not None:
+                dp = (self._out(b["uid"], "HAS_DYNAMIC_PERFORMANCE") or [None])[0]
+                if dp is not None:
+                    dp.update({k: v for k, v in (("soh", soh), ("soc", soc)) if v is not None},
+                              measuredAt=ts)
             mods = {m["index"]: m for m in self._out(b["uid"], "HAS_MODULE")}
             raised = []
             for rd in readings:
@@ -293,14 +397,32 @@ class MemoryRepo:
             b["lastTelemetryAt"] = ts
             return raised
 
+    def _prune_readings(self, battery_uid, keep=telemetry.READINGS_KEPT):
+        """Le mode mémoire garde les derniers relevés (Neo4j garde tout l'historique)."""
+        uids = [r[2] for r in self.rels if r[0] == battery_uid and r[1] == "HAS_TELEMETRY"]
+        if len(uids) <= keep:
+            return
+        old = set(uids[:-keep])
+        self.rels = [r for r in self.rels if not (r[1] == "HAS_TELEMETRY" and r[2] in old)]
+        for uid in old:
+            self.nodes.pop(uid, None)
+
+    def count_readings(self, battery_id):
+        with self.lock:
+            b = self._battery(battery_id)
+            return len(self._out(b["uid"], "HAS_TELEMETRY")) if b else 0
+
     def get_telemetry(self, battery_id, limit=60):
         with self.lock:
             b = self._battery(battery_id)
             if b is None:
                 return None
             mods = sorted(self._out(b["uid"], "HAS_MODULE"), key=lambda m: m["index"])
+            dp = (self._out(b["uid"], "HAS_DYNAMIC_PERFORMANCE") or [{}])[0]
             return dict(
                 batteryId=battery_id, lastTelemetryAt=b.get("lastTelemetryAt"),
+                soh=dp.get("soh"), soc=dp.get("soc"),
+                readings=len(self._out(b["uid"], "HAS_TELEMETRY")),
                 modules=[dict(index=m["index"], r=m.get("internalResistance_mOhm"),
                               rmax=m.get("maxInternalResistance_mOhm"), health=m.get("health"),
                               t=m.get("lastTemperature"), v=m.get("lastVoltage"),
@@ -312,12 +434,15 @@ class MemoryRepo:
 
     # --- écritures (appelées par bp.workflow après contrôle des règles) ---------
     def create_status_request(self, battery_id, actor_uid, operator_uid, from_status,
-                              requested_status, reason, diagnostic):
+                              requested_status, reason, diagnostic, destination_uid="",
+                              auto_logistics=False, pickup_date="", pickup_slot=""):
         with self.lock:
             b = self._battery(battery_id)
             uid = self._add("Notification", new_uid("NOTIF"), type="STATUS_CHANGE_REQUEST",
                             fromStatus=from_status, requestedStatus=requested_status,
-                            reason=reason, diagnostic=diagnostic, state="PENDING", createdAt=now())
+                            reason=reason, diagnostic=diagnostic, destinationUid=destination_uid,
+                            autoLogistics=bool(auto_logistics), pickupDate=pickup_date or "",
+                            pickupSlot=pickup_slot or "", state="PENDING", createdAt=now())
             self.rels += [[actor_uid, "SENT", uid], [uid, "ABOUT", b["uid"]],
                           [uid, "ADDRESSED_TO", operator_uid]]
             self._event(b["uid"], "FAULT_REPORTED", actor_uid,

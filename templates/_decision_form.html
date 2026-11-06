@@ -2,15 +2,20 @@
   <form method="post" action="{{ url_for('owner_approve', notif_uid=n.uid) }}"
         onsubmit="return confirm('Passer {{ n.batteryId }} en Waste et créer l\'ordre de transfert ?')">
     <input type="hidden" name="back" value="{{ request.url.path }}">
-    <label for="dest-{{ n.uid }}">Centre de tri de destination</label>
+    <label for="dest-{{ n.uid }}">Centre de tri de destination {% if n.destinationName %}<span class="mute">(proposé par le garage)</span>{% endif %}</label>
     <select id="dest-{{ n.uid }}" name="destination" required>
       {% for c in centers %}
-        <option value="{{ c.uid }}" {% if not c.agreed %}disabled{% endif %}>
-          {{ c.name }} ({{ c.city }}) {{ '· agréé ' ~ c.agreementNumber if c.agreed else '· non agréé' }}</option>
+        <option value="{{ c.uid }}" {% if c.problems %}disabled{% elif c.uid == n.destinationUid %}selected{% endif %}>
+          {{ c.name }} ({{ c.city }}) {{ '· ' ~ c.problems|join(', ') if c.problems else '· agréé ' ~ c.agreementNumber }}</option>
       {% endfor %}
     </select>
     <label for="cmt-{{ n.uid }}">Commentaire <span class="mute">(optionnel)</span></label>
     <input id="cmt-{{ n.uid }}" name="comment" placeholder="Enlèvement sous 48 h">
+    {% if n.autoLogistics %}
+      <p class="small soft" style="margin-top:12px">{{ icon('truck') }} Collecte automatique demandée par le garage : {{ n.pickupDate or 'au plus tôt' }} {{ n.pickupSlot }}. Un transporteur agréé ADR sera affecté à la validation.</p>
+    {% else %}
+      <p class="small mute" style="margin-top:12px">Vous choisirez le transporteur et la date d'enlèvement après validation.</p>
+    {% endif %}
     <button class="btn primary block" style="margin-top:14px" type="submit">{{ icon('check') }} Valider : Original vers Waste et transfert</button>
   </form>
   <form method="post" action="{{ url_for('owner_reject', notif_uid=n.uid) }}">

@@ -47,7 +47,7 @@ Demo on a laptop on local Wi-Fi; tablet and phone open the site through printed 
 
 ## Evidence on Hand
 
-- Demo dataset in `bp/seed_data.py` (7 batteries, 2 models, actors, market demands). Doc's battery is `DLR-1985`.
+- Demo dataset in `bp/seed_data.py` (7 batteries, 2 models, actors, market demands). Doc's battery is `BAT-DOC-001`.
 - ESP32 firmware (`esp32/firmware`), Wokwi sketch and Python emulator.
 - No real customers, metrics, or endorsements: none may be invented.
 

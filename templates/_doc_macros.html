@@ -1,0 +1,37 @@
+{% macro head(doc, title) %}
+<header class="head">
+  <div>
+    <h1>{{ title }}</h1>
+    <div class="meta">Ordre <strong>{{ doc.order.uid }}</strong> · {{ doc.stateLabel }} · généré le {{ doc.generatedAt|ts }}</div>
+    <div class="id" style="margin-top:10px">{{ doc.battery.batteryId }}</div>
+    <div class="small mute">Passeport {{ doc.battery.batteryPassportId }} · N° de série {{ doc.battery.serialNumber }} · {{ doc.battery.model }} · {{ doc.battery.chemistry }}</div>
+  </div>
+  {% if qr %}<div class="qr">{{ qr }}</div>{% endif %}
+</header>
+{% endmacro %}
+
+{% macro party(label, a) %}
+<div class="box">
+  <h3>{{ label }}</h3>
+  {% if a %}
+    <strong>{{ a.name }}</strong>
+    {% if a.address or a.city %}<div>{{ a.address or a.city }}</div>{% endif %}
+    {% if a.email %}<div class="small mute">{{ a.email }}</div>{% endif %}
+    {% if a.agreementNumber %}<div class="small">Agrément {{ a.agreementNumber }}{% if a.agreementValidUntil %}, valide jusqu'au {{ a.agreementValidUntil }}{% endif %}</div>{% endif %}
+    {% if a.siret %}<div class="small mute">SIRET {{ a.siret }}</div>{% endif %}
+  {% else %}<span class="mute">À affecter</span>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro goods(doc) %}{% set dg = doc.dangerousGoods %}
+<div class="box">
+  <h3>Marchandise dangereuse (ADR)</h3>
+  <table>
+    <thead><tr><th>N° ONU</th><th>Désignation</th><th>Classe</th><th>Emballage</th><th>Masse</th><th>Code déchet</th></tr></thead>
+    <tbody><tr><td>{{ dg.unNumber }}</td><td>{{ dg.designation }}<div class="small mute">{{ dg.condition }} · {{ dg.specialProvision }}</div></td>
+      <td>{{ dg.class }} ({{ dg.tunnelCode }})</td><td>{{ dg.packingInstruction }}</td>
+      <td>{{ doc.custody.pickupWeightKg or doc.battery.declaredWeightKg or 'n.c.' }} kg</td><td>{{ doc.waste.code }}</td></tr></tbody>
+  </table>
+  {% if dg.heavyLoad %}<p class="small" style="margin:8px 0 0">Plus de 333 kg : conducteur formé ADR et consignes écrites à bord obligatoires.</p>{% endif %}
+</div>
+{% endmacro %}
